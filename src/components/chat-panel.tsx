@@ -8,7 +8,7 @@ import { useProjectStore, STAGES } from "@/store/project";
 import { Send, Loader2, Key, ChevronRight } from "lucide-react";
 
 export default function ChatPanel() {
-  const { apiKey, provider, openModal } = useApiKeyStore();
+  const { apiKey, provider, baseURL, openModal } = useApiKeyStore();
   const { activeStage, markStageComplete, nextStage, appName, setAppName, updateStageData, appendDocument } = useProjectStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
@@ -17,7 +17,7 @@ export default function ChatPanel() {
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      body: { provider, apiKey, stage: activeStage },
+      body: { provider, apiKey, baseURL, stage: activeStage },
     }),
     onFinish: (result) => {
       const stageKey = ["brand", "prd", "srs", "sdd", "ux", "tasks"][activeStage];
