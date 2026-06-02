@@ -4,18 +4,18 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { SYSTEM_PROMPTS } from "@/lib/system-prompts";
 
-const PROVIDER_CONFIG: Record<string, { type: "openai" | "anthropic" | "gemini"; baseURL?: string; model: string }> = {
-  openai: { type: "openai", model: "gpt-4o" },
-  anthropic: { type: "anthropic", model: "claude-sonnet-4-20250514" },
-  gemini: { type: "gemini", model: "gemini-2.5-flash" },
-  openrouter: { type: "openai", baseURL: "https://openrouter.ai/api/v1", model: "openai/gpt-4o" },
-  deepseek: { type: "openai", baseURL: "https://api.deepseek.com/v1", model: "deepseek-chat" },
-  groq: { type: "openai", baseURL: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile" },
+const PROVIDER_CONFIG: Record<string, { type: "openai" | "anthropic" | "gemini"; baseURL?: string }> = {
+  openai: { type: "openai" },
+  anthropic: { type: "anthropic" },
+  gemini: { type: "gemini" },
+  openrouter: { type: "openai", baseURL: "https://openrouter.ai/api/v1" },
+  deepseek: { type: "openai", baseURL: "https://api.deepseek.com/v1" },
+  groq: { type: "openai", baseURL: "https://api.groq.com/openai/v1" },
 };
 
 export async function POST(req: Request) {
   try {
-    const { messages, provider, apiKey, baseURL, stage } = await req.json();
+    const { messages, provider, model, apiKey, baseURL, stage } = await req.json();
 
     if (!apiKey) {
       return new Response(JSON.stringify({ error: "API Key diperlukan" }), {
@@ -24,25 +24,26 @@ export async function POST(req: Request) {
       });
     }
 
-    const config = PROVIDER_CONFIG[provider] || { type: "openai" as const, model: "gpt-4o" };
+    const config = PROVIDER_CONFIG[provider] || { type: "openai" as const };
     const effectiveBaseURL = baseURL || config.baseURL || undefined;
+    const modelName = model || "gpt-4o";
     const systemPrompt = SYSTEM_PROMPTS[stage as keyof typeof SYSTEM_PROMPTS] || SYSTEM_PROMPTS[0];
 
-    let model;
+    let llmModel;
 
     if (config.type === "anthropic") {
       const client = createAnthropic({ apiKey });
-      model = client(config.model);
+      llmModel = client(modelName);
     } else if (config.type === "gemini") {
       const client = createGoogleGenerativeAI({ apiKey });
-      model = client(config.model);
+      llmModel = client(modelName);
     } else {
       const client = createOpenAI({ apiKey, baseURL: effectiveBaseURL });
-      model = client(config.model);
+      llmModel = client(modelName);
     }
 
     const result = streamText({
-      model,
+      model: llmModel,
       system: systemPrompt,
       messages,
     });

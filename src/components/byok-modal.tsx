@@ -5,10 +5,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useApiKeyStore, PROVIDER_LIST, AIProvider } from "@/store/api-key";
-import { Key, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { Key, Eye, EyeOff, ExternalLink, Sparkles } from "lucide-react";
 
 export default function ByokModal() {
-  const { provider, apiKey, baseURL, isModalOpen, setProvider, setApiKey, setBaseURL, saveKey } = useApiKeyStore();
+  const { provider, apiKey, baseURL, model, isModalOpen, setProvider, setApiKey, setBaseURL, setModel, saveKey } = useApiKeyStore();
   const [showKey, setShowKey] = useState(false);
   const [error, setError] = useState("");
 
@@ -33,8 +33,12 @@ export default function ByokModal() {
       setError("Base URL wajib diisi untuk provider Custom");
       return;
     }
+    if (!model.trim()) {
+      setError("Nama model tidak boleh kosong");
+      return;
+    }
     setError("");
-    saveKey(provider, key, baseURL || undefined);
+    saveKey(provider, key, baseURL || undefined, model);
   };
 
   const hasNoKey = !apiKey.trim() && isModalOpen;
@@ -55,13 +59,13 @@ export default function ByokModal() {
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium mb-1.5 block">Penyedia AI</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {KNOWN_PROVIDERS.map((p) => (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => setProvider(p.id as AIProvider)}
-                  className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition-all ${
+                  className={`px-2 py-2 rounded-lg text-xs font-medium border transition-all ${
                     provider === p.id
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-border text-muted-foreground hover:border-primary/50"
@@ -73,7 +77,7 @@ export default function ByokModal() {
               <button
                 type="button"
                 onClick={() => setProvider("custom")}
-                className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition-all ${
+                className={`px-2 py-2 rounded-lg text-xs font-medium border transition-all ${
                   provider === "custom"
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border text-muted-foreground hover:border-primary/50"
@@ -106,7 +110,41 @@ export default function ByokModal() {
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-1.5 block">Base URL</label>
+            <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" />
+              Model
+            </label>
+            <Input
+              type="text"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder={currentProvider.defaultModel || "custom-model-name"}
+              className="font-mono text-xs"
+            />
+            {currentProvider.models.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {currentProvider.models.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setModel(m)}
+                    className={`text-[10px] px-2 py-1 rounded-md border transition-all ${
+                      model === m
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/50"
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">
+              Base URL <span className="text-[10px] text-muted-foreground font-normal">(opsional)</span>
+            </label>
             <Input
               type="text"
               value={baseURL}
@@ -114,9 +152,6 @@ export default function ByokModal() {
               placeholder={currentProvider.baseURL || "https://api.openai.com/v1"}
               className="font-mono text-xs"
             />
-            <p className="text-[10px] text-muted-foreground mt-1">
-              Biarkan kosong untuk menggunakan default penyedia.
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
