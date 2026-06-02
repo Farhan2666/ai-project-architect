@@ -59,7 +59,7 @@ export default function ByokModal() {
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium mb-1.5 block">Penyedia AI</label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {KNOWN_PROVIDERS.map((p) => (
                 <button
                   key={p.id}
