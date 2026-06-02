@@ -59,7 +59,7 @@ export default function ChatPanel() {
 
   if (!apiKey) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full max-md:pb-14">
         <Header stageInfo={stageInfo} />
         <div className="flex-1 flex items-center justify-center p-4">
           <button onClick={openModal} className="flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
@@ -72,7 +72,7 @@ export default function ChatPanel() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full max-md:pb-14">
       <Header stageInfo={stageInfo} activeStage={activeStage} />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

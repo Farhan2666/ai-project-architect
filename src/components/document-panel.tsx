@@ -43,7 +43,7 @@ export default function DocumentPanel() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full max-md:pb-14">
       <header className="border-b border-border p-4 flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2">

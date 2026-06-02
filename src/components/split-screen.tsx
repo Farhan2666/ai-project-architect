@@ -36,7 +36,7 @@ export default function SplitScreen({ left, right, defaultLeftWidth = 50 }: Spli
       {/* Left panel */}
       <div
         className={cn(
-          "overflow-auto flex flex-col max-md:pb-14",
+          "overflow-auto flex flex-col",
           mobileTab === "doc" && "max-md:hidden"
         )}
         style={{ width: `${leftWidth}%` }}
@@ -57,7 +57,7 @@ export default function SplitScreen({ left, right, defaultLeftWidth = 50 }: Spli
       {/* Right panel */}
       <div
         className={cn(
-          "flex-1 overflow-auto flex flex-col max-md:pb-14",
+          "flex-1 overflow-auto flex flex-col",
           mobileTab === "chat" && "max-md:hidden"
         )}
       >
