@@ -8,9 +8,9 @@ import { useApiKeyStore } from "@/store/api-key";
 import { Key, Eye, EyeOff, ExternalLink } from "lucide-react";
 
 const PROVIDERS = [
-  { id: "openai" as const, label: "OpenAI", format: "sk-..." },
-  { id: "anthropic" as const, label: "Anthropic", format: "sk-ant-..." },
-  { id: "gemini" as const, label: "Gemini", format: "AIza..." },
+  { id: "openai" as const, label: "OpenAI", format: "sk-...", pattern: /^sk-/ },
+  { id: "anthropic" as const, label: "Anthropic", format: "sk-ant-...", pattern: /^sk-ant-/ },
+  { id: "gemini" as const, label: "Gemini", format: "AIza...", pattern: /^AIza/ },
 ];
 
 export default function ByokModal() {
@@ -21,12 +21,18 @@ export default function ByokModal() {
   const currentProvider = PROVIDERS.find((p) => p.id === provider) || PROVIDERS[0];
 
   const handleSave = () => {
-    if (!apiKey.trim()) {
+    const key = apiKey.trim();
+    if (!key) {
       setError("API Key tidak boleh kosong");
       return;
     }
+    const prov = PROVIDERS.find((p) => p.id === provider) || PROVIDERS[0];
+    if (prov.pattern && !prov.pattern.test(key)) {
+      setError(`Format tidak valid. Key ${prov.label} biasanya dimulai dengan "${prov.format}"`);
+      return;
+    }
     setError("");
-    saveKey(provider, apiKey.trim());
+    saveKey(provider, key);
   };
 
   const hasNoKey = !apiKey.trim() && isModalOpen;

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export const STAGES = [
   { id: 0, label: "Brand & Identity", short: "Brand" },
@@ -47,55 +48,62 @@ const INITIAL_STAGES: StageData = {
   tasks: {},
 };
 
-export const useProjectStore = create<ProjectState>((set, get) => ({
-  activeStage: 0,
-  appName: "",
-  stages: { ...INITIAL_STAGES, brand: { ...INITIAL_STAGES.brand }, prd: { ...INITIAL_STAGES.prd }, srs: { ...INITIAL_STAGES.srs }, sdd: { ...INITIAL_STAGES.sdd }, ux: { ...INITIAL_STAGES.ux }, tasks: { ...INITIAL_STAGES.tasks } },
-  document: "",
-  completedStages: [],
-
-  setAppName: (name) => set({ appName: name }),
-
-  setActiveStage: (stage) => set({ activeStage: stage }),
-
-  nextStage: () => {
-    const { activeStage } = get();
-    if (activeStage < 5) set({ activeStage: activeStage + 1 as StageId });
-  },
-
-  prevStage: () => {
-    const { activeStage } = get();
-    if (activeStage > 0) set({ activeStage: activeStage - 1 as StageId });
-  },
-
-  updateStageData: (stage, key, value) =>
-    set((state) => ({
-      stages: {
-        ...state.stages,
-        [stage]: { ...state.stages[stage], [key]: value },
-      },
-    })),
-
-  setDocument: (doc) => set({ document: doc }),
-
-  appendDocument: (text) =>
-    set((state) => ({ document: state.document + "\n" + text })),
-
-  markStageComplete: (stage) =>
-    set((state) => ({
-      completedStages: state.completedStages.includes(stage)
-        ? state.completedStages
-        : [...state.completedStages, stage],
-    })),
-
-  isStageComplete: (stage) => get().completedStages.includes(stage),
-
-  reset: () =>
-    set({
+export const useProjectStore = create<ProjectState>()(
+  persist(
+    (set, get) => ({
       activeStage: 0,
       appName: "",
-      stages: { ...INITIAL_STAGES },
+      stages: structuredClone(INITIAL_STAGES),
       document: "",
       completedStages: [],
+
+      setAppName: (name) => set({ appName: name }),
+
+      setActiveStage: (stage) => set({ activeStage: stage }),
+
+      nextStage: () => {
+        const { activeStage } = get();
+        if (activeStage < 5) set({ activeStage: activeStage + 1 as StageId });
+      },
+
+      prevStage: () => {
+        const { activeStage } = get();
+        if (activeStage > 0) set({ activeStage: activeStage - 1 as StageId });
+      },
+
+      updateStageData: (stage, key, value) =>
+        set((state) => ({
+          stages: {
+            ...state.stages,
+            [stage]: { ...state.stages[stage], [key]: value },
+          },
+        })),
+
+      setDocument: (doc) => set({ document: doc }),
+
+      appendDocument: (text) =>
+        set((state) => ({ document: state.document + "\n" + text })),
+
+      markStageComplete: (stage) =>
+        set((state) => ({
+          completedStages: state.completedStages.includes(stage)
+            ? state.completedStages
+            : [...state.completedStages, stage],
+        })),
+
+      isStageComplete: (stage) => get().completedStages.includes(stage),
+
+      reset: () =>
+        set({
+          activeStage: 0,
+          appName: "",
+          stages: structuredClone(INITIAL_STAGES),
+          document: "",
+          completedStages: [],
+        }),
     }),
-}));
+    {
+      name: "ai-project-architect-project",
+    }
+  )
+);
