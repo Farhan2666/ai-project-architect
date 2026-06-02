@@ -13,6 +13,22 @@ const PROVIDER_CONFIG: Record<string, { type: "openai" | "anthropic" | "gemini";
   groq: { type: "openai", baseURL: "https://api.groq.com/openai/v1" },
 };
 
+const RATE_LIMIT_WINDOW = 60_000;
+const RATE_LIMIT_MAX = 30;
+const rateMap = new Map<string, { count: number; resetAt: number }>();
+
+function rateLimit(key: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const entry = rateMap.get(key);
+  if (!entry || now > entry.resetAt) {
+    rateMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    return { allowed: true, remaining: RATE_LIMIT_MAX - 1 };
+  }
+  entry.count++;
+  const remaining = Math.max(0, RATE_LIMIT_MAX - entry.count);
+  return { allowed: entry.count <= RATE_LIMIT_MAX, remaining };
+}
+
 export async function POST(req: Request) {
   try {
     const { messages, provider, model, apiKey, baseURL, stage } = await req.json();
@@ -21,6 +37,17 @@ export async function POST(req: Request) {
       return new Response(JSON.stringify({ error: "API Key diperlukan" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+    const rlKey = `${ip}:${apiKey.slice(0, 8)}`;
+    const { allowed, remaining } = rateLimit(rlKey);
+
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "Too many requests. Silakan tunggu." }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", "X-RateLimit-Remaining": "0" },
       });
     }
 
@@ -48,7 +75,15 @@ export async function POST(req: Request) {
       messages,
     });
 
-    return result.toTextStreamResponse();
+    const stream = result.toTextStreamResponse();
+    const headers = new Headers(stream.headers);
+    headers.set("X-RateLimit-Remaining", String(remaining));
+
+    return new Response(stream.body, {
+      status: stream.status,
+      statusText: stream.statusText,
+      headers,
+    });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {

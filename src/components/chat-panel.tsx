@@ -14,7 +14,7 @@ export default function ChatPanel() {
   const [input, setInput] = useState("");
   const stageInfo = STAGES[activeStage];
 
-  const { messages, sendMessage, status, error } = useChat({
+  const { messages, sendMessage, regenerate, status, error } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
       body: { provider, apiKey, baseURL, model, stage: activeStage },
@@ -119,8 +119,14 @@ export default function ChatPanel() {
       </div>
 
       {error && (
-        <div className="px-4 py-2 bg-destructive/10 border-t border-destructive/20 text-destructive text-xs">
-          Error: {error.message}
+        <div className="px-4 py-2 bg-destructive/10 border-t border-destructive/20 text-destructive text-xs flex items-center justify-between gap-2">
+          <span className="flex-1 truncate">Error: {error.message}</span>
+          <button
+            onClick={() => regenerate()}
+            className="shrink-0 text-xs font-medium hover:underline"
+          >
+            Retry
+          </button>
         </div>
       )}
 

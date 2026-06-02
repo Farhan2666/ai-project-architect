@@ -5,11 +5,13 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useProjectStore, STAGES } from "@/store/project";
 import { useApiKeyStore } from "@/store/api-key";
+import { useToast } from "@/components/toast";
 import { FileText, Download, Loader2 } from "lucide-react";
 
 export default function DocumentPanel() {
   const { activeStage, document, stages, appName } = useProjectStore();
   const { apiKey } = useApiKeyStore();
+  const { show } = useToast();
   const stageInfo = STAGES[activeStage];
 
   const hasData = Object.values(stages).some((s) => Object.keys(s).length > 0) || document.length > 0;
@@ -37,6 +39,7 @@ export default function DocumentPanel() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+    show(`${ext} exported successfully`);
   };
 
   return (
