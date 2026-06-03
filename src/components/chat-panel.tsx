@@ -7,7 +7,7 @@ import { DefaultChatTransport } from "ai";
 import { cn } from "@/lib/utils";
 import { useApiKeyStore } from "@/store/api-key";
 import { useProjectStore, STAGES } from "@/store/project";
-import { Send, Loader2, Key, ChevronRight } from "lucide-react";
+import { Send, Loader2, Key, ChevronRight, Settings } from "lucide-react";
 
 export default function ChatPanel() {
   const { apiKey, provider, baseURL, model, openModal } = useApiKeyStore();
@@ -170,16 +170,24 @@ export default function ChatPanel() {
 
 function Header({ stageInfo, activeStage }: { stageInfo: typeof STAGES[number]; activeStage?: number }) {
   const { appName } = useProjectStore();
+  const { provider, openModal } = useApiKeyStore();
   return (
-    <header className="border-b border-border p-4">
+    <header className="border-b border-border/50 p-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold">AI Project Architect</h1>
-          <p className="text-xs text-muted-foreground">
+        <div className="min-w-0">
+          <h1 className="text-lg font-semibold truncate">AI Project Architect</h1>
+          <p className="text-xs text-muted-foreground truncate">
             {appName ? `${appName} — ` : ""}
             Stage {activeStage !== undefined ? activeStage + 1 : "?"}/6: {stageInfo.label}
           </p>
         </div>
+        <button
+          onClick={openModal}
+          className="shrink-0 ml-2 w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+          title={`API Key: ${provider}`}
+        >
+          <Key className="w-4 h-4" />
+        </button>
       </div>
     </header>
   );
