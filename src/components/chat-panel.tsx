@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { TextStreamChatTransport } from "ai";
 import { cn } from "@/lib/utils";
 import { useApiKeyStore } from "@/store/api-key";
 import { useProjectStore, STAGES, type StageId } from "@/store/project";
@@ -72,17 +72,15 @@ export default function ChatPanel() {
   stageInfoRef.current = stageInfo;
 
   const { messages, sendMessage, regenerate, status, error } = useChat({
-    transport: new DefaultChatTransport({
+    transport: new TextStreamChatTransport({
       api: "/api/chat",
-      fetch: async (input, init) => {
-        const body = JSON.parse(init?.body as string || "{}");
-        body.apiKey = useApiKeyStore.getState().apiKey;
-        body.provider = useApiKeyStore.getState().provider;
-        body.baseURL = useApiKeyStore.getState().baseURL;
-        body.model = useApiKeyStore.getState().model;
-        body.stage = useProjectStore.getState().activeStage;
-        return fetch(input, { ...init, body: JSON.stringify(body) });
-      },
+      body: () => ({
+        provider: useApiKeyStore.getState().provider,
+        apiKey: useApiKeyStore.getState().apiKey,
+        baseURL: useApiKeyStore.getState().baseURL,
+        model: useApiKeyStore.getState().model,
+        stage: useProjectStore.getState().activeStage,
+      }),
     }),
     onFinish: (result) => {
       const s = stageRef.current;
