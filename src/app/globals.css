@@ -125,3 +125,65 @@
     font-family: Arial, Helvetica, sans-serif;
   }
 }
+
+@layer utilities {
+  .mesh-bg {
+    background: linear-gradient(135deg, #0f0a1e 0%, #160b2e 25%, #0a1a1a 50%, #0d1117 75%, #0f0a1e 100%);
+    background-size: 400% 400%;
+    animation: mesh-shift 20s ease infinite;
+  }
+
+  .glass {
+    background: rgba(15, 15, 30, 0.65);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .glass-strong {
+    background: rgba(10, 10, 25, 0.8);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .shimmer-border {
+    position: relative;
+  }
+  .shimmer-border::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(120, 80, 255, 0.3) 25%,
+      rgba(0, 200, 180, 0.3) 50%,
+      rgba(120, 80, 255, 0.3) 75%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer-slide 2.5s linear infinite;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    z-index: 1;
+  }
+}
+
+@keyframes mesh-shift {
+  0% { background-position: 0% 50%; }
+  25% { background-position: 100% 0%; }
+  50% { background-position: 100% 100%; }
+  75% { background-position: 0% 100%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes shimmer-slide {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

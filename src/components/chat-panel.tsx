@@ -2,7 +2,9 @@
 
 import { useRef, useEffect, useState } from "react";
 import { useChat } from "@ai-sdk/react";
+import { motion } from "framer-motion";
 import { DefaultChatTransport } from "ai";
+import { cn } from "@/lib/utils";
 import { useApiKeyStore } from "@/store/api-key";
 import { useProjectStore, STAGES } from "@/store/project";
 import { Send, Loader2, Key, ChevronRight } from "lucide-react";
@@ -72,7 +74,7 @@ export default function ChatPanel() {
   }
 
   return (
-    <div className="flex flex-col h-full max-md:pb-14">
+    <div className={cn("flex flex-col h-full max-md:pb-14", isLoading && "shimmer-border")}>
       <Header stageInfo={stageInfo} activeStage={activeStage} />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
