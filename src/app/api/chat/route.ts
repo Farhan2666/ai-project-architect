@@ -30,12 +30,19 @@ function rateLimit(key: string): { allowed: boolean; remaining: number } {
 }
 
 function toCoreMessage(msg: any) {
-  if (msg.content) return { role: msg.role, content: msg.content };
-  const text = msg.parts
-    ?.filter((p: any) => p.type === "text")
-    .map((p: any) => p.text)
-    .join("") ?? "";
-  return { role: msg.role, content: text };
+  if (msg.content) {
+    return {
+      role: msg.role,
+      content: typeof msg.content === "string"
+        ? [{ type: "text" as const, text: msg.content }]
+        : msg.content,
+    };
+  }
+  const textParts = msg.parts?.filter((p: any) => p.type === "text") ?? [];
+  return {
+    role: msg.role,
+    content: textParts.map((p: any) => ({ type: "text" as const, text: p.text })),
+  };
 }
 
 export async function POST(req: Request) {
