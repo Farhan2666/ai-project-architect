@@ -17,7 +17,7 @@ export default function SplitScreen({ left, right }: SplitScreenProps) {
   const hasData = doc.length > 0 || completedStages.length > 0;
 
   return (
-    <div className="mesh-bg flex h-screen w-full overflow-hidden">
+    <div className="bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-950/40 via-slate-950 to-black flex h-screen w-full overflow-hidden">
       {/* Left panel — morphs between centered focus and floating sidebar */}
       <motion.div
         layout
@@ -36,10 +36,10 @@ export default function SplitScreen({ left, right }: SplitScreenProps) {
       >
         <div
           className={cn(
-            "flex flex-col h-full rounded-2xl overflow-hidden",
+            "flex flex-col h-full overflow-hidden",
             hasData
-              ? "glass-strong shadow-2xl shadow-black/40"
-              : "glass shadow-xl shadow-black/30 max-w-2xl mx-auto my-auto max-h-[90vh]"
+              ? "bg-slate-950/40 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-purple-950/20"
+              : "bg-slate-950/40 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-purple-950/20 max-w-2xl mx-auto my-auto max-h-[90vh]"
           )}
         >
           {left}
@@ -61,7 +61,7 @@ export default function SplitScreen({ left, right }: SplitScreenProps) {
               mobileTab === "doc" && "max-md:flex max-md:w-full"
             )}
           >
-            <div className="flex flex-col h-full m-3 rounded-2xl glass overflow-hidden">
+            <div className="flex flex-col h-full m-3 rounded-2xl bg-slate-950/40 backdrop-blur-xl border border-white/10 overflow-hidden">
               {right}
             </div>
           </motion.div>
@@ -69,12 +69,12 @@ export default function SplitScreen({ left, right }: SplitScreenProps) {
       </AnimatePresence>
 
       {/* Mobile tab bar */}
-      <div className="hidden max-md:flex fixed bottom-0 left-0 right-0 h-14 bg-background/90 backdrop-blur-lg border-t border-border z-50 items-center justify-around px-4">
+      <div className="hidden max-md:flex fixed bottom-0 left-0 right-0 h-14 bg-black/80 backdrop-blur-xl border-t border-white/10 z-50 items-center justify-around px-4">
         <button
           onClick={() => setMobileTab("chat")}
           className={cn(
             "flex flex-col items-center gap-0.5 text-[10px] font-medium transition-colors",
-            mobileTab === "chat" ? "text-foreground" : "text-muted-foreground"
+            mobileTab === "chat" ? "text-white" : "text-white/50"
           )}
         >
           <MessageSquare className="w-5 h-5" />
@@ -84,7 +84,7 @@ export default function SplitScreen({ left, right }: SplitScreenProps) {
           onClick={() => setMobileTab("doc")}
           className={cn(
             "flex flex-col items-center gap-0.5 text-[10px] font-medium transition-colors",
-            mobileTab === "doc" ? "text-foreground" : "text-muted-foreground"
+            mobileTab === "doc" ? "text-white" : "text-white/50"
           )}
         >
           <FileText className="w-5 h-5" />
