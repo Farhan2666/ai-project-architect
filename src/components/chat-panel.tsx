@@ -74,13 +74,15 @@ export default function ChatPanel() {
   const { messages, sendMessage, regenerate, status, error } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      body: () => ({
-        provider: useApiKeyStore.getState().provider,
-        apiKey: useApiKeyStore.getState().apiKey,
-        baseURL: useApiKeyStore.getState().baseURL,
-        model: useApiKeyStore.getState().model,
-        stage: useProjectStore.getState().activeStage,
-      }),
+      fetch: async (input, init) => {
+        const body = JSON.parse(init?.body as string || "{}");
+        body.apiKey = useApiKeyStore.getState().apiKey;
+        body.provider = useApiKeyStore.getState().provider;
+        body.baseURL = useApiKeyStore.getState().baseURL;
+        body.model = useApiKeyStore.getState().model;
+        body.stage = useProjectStore.getState().activeStage;
+        return fetch(input, { ...init, body: JSON.stringify(body) });
+      },
     }),
     onFinish: (result) => {
       const s = stageRef.current;
