@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { setProjectData, deleteProjectData } from "@/lib/db";
 
 export const STAGES = [
   { id: 0, label: "Brand & Identity", short: "Brand" },
@@ -27,6 +28,7 @@ interface ProjectState {
   stages: StageData;
   document: string;
   completedStages: StageId[];
+  hydrated: boolean;
   setAppName: (name: string) => void;
   setActiveStage: (stage: StageId) => void;
   nextStage: () => void;
@@ -37,6 +39,7 @@ interface ProjectState {
   markStageComplete: (stage: StageId) => void;
   isStageComplete: (stage: StageId) => boolean;
   reset: () => void;
+  hydrate: (data: Partial<ProjectState>) => void;
 }
 
 const INITIAL_STAGES: StageData = {
@@ -48,6 +51,16 @@ const INITIAL_STAGES: StageData = {
   tasks: {},
 };
 
+function persistLargeData(state: ProjectState) {
+  setProjectData({
+    document: state.document,
+    stages: JSON.stringify(state.stages),
+    appName: state.appName,
+    completedStages: JSON.stringify(state.completedStages),
+    activeStage: state.activeStage,
+  });
+}
+
 export const useProjectStore = create<ProjectState>()(
   persist(
     (set, get) => ({
@@ -56,54 +69,81 @@ export const useProjectStore = create<ProjectState>()(
       stages: structuredClone(INITIAL_STAGES),
       document: "",
       completedStages: [],
+      hydrated: false,
 
-      setAppName: (name) => set({ appName: name }),
+      hydrate: (data) =>
+        set((state) => ({
+          ...state,
+          ...data,
+          hydrated: true,
+        })),
+
+      setAppName: (name) => {
+        set({ appName: name });
+        persistLargeData(get());
+      },
 
       setActiveStage: (stage) => set({ activeStage: stage }),
 
       nextStage: () => {
         const { activeStage } = get();
-        if (activeStage < 5) set({ activeStage: activeStage + 1 as StageId });
+        if (activeStage < 5) set({ activeStage: (activeStage + 1) as StageId });
       },
 
       prevStage: () => {
         const { activeStage } = get();
-        if (activeStage > 0) set({ activeStage: activeStage - 1 as StageId });
+        if (activeStage > 0) set({ activeStage: (activeStage - 1) as StageId });
       },
 
-      updateStageData: (stage, key, value) =>
+      updateStageData: (stage, key, value) => {
         set((state) => ({
           stages: {
             ...state.stages,
             [stage]: { ...state.stages[stage], [key]: value },
           },
-        })),
+        }));
+        persistLargeData(get());
+      },
 
-      setDocument: (doc) => set({ document: doc }),
+      setDocument: (doc) => {
+        set({ document: doc });
+        persistLargeData(get());
+      },
 
-      appendDocument: (text) =>
-        set((state) => ({ document: state.document + "\n" + text })),
+      appendDocument: (text) => {
+        set((state) => ({ document: state.document + "\n" + text }));
+        persistLargeData(get());
+      },
 
-      markStageComplete: (stage) =>
+      markStageComplete: (stage) => {
         set((state) => ({
           completedStages: state.completedStages.includes(stage)
             ? state.completedStages
             : [...state.completedStages, stage],
-        })),
+        }));
+        persistLargeData(get());
+      },
 
       isStageComplete: (stage) => get().completedStages.includes(stage),
 
-      reset: () =>
+      reset: () => {
         set({
           activeStage: 0,
           appName: "",
           stages: structuredClone(INITIAL_STAGES),
           document: "",
           completedStages: [],
-        }),
+        });
+        deleteProjectData();
+      },
     }),
     {
-      name: "ai-project-architect-project",
+      name: "ai-project-architect-ui",
+      partialize: (state) => ({
+        activeStage: state.activeStage,
+        appName: state.appName,
+        completedStages: state.completedStages,
+      }),
     }
   )
 );

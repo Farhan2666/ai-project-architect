@@ -1,21 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { useProjectStore, STAGES } from "@/store/project";
+import { useProjectStore, STAGES, type StageData } from "@/store/project";
 import { useApiKeyStore } from "@/store/api-key";
 import { useToast } from "@/components/toast";
-import { FileText, Download, Edit3, Eye, Trash2, RotateCcw } from "lucide-react";
+import { FileText, Download, Edit3, Eye, Trash2, Upload, FileJson } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { compileToTXT, compileToHTML } from "@/utils/sanitize";
 
 export default function DocumentPanel() {
-  const { activeStage, document: docContent, stages, appName, setDocument, setActiveStage } = useProjectStore();
+  const { activeStage, document: docContent, stages, appName, setDocument, setActiveStage, reset } = useProjectStore();
   const { apiKey } = useApiKeyStore();
   const { show } = useToast();
   const stageInfo = STAGES[activeStage];
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState("");
+  const importRef = useRef<HTMLInputElement>(null);
 
   const hasData = Object.values(stages).some((s) => Object.keys(s).length > 0) || docContent.length > 0;
 
@@ -28,21 +30,82 @@ export default function DocumentPanel() {
     }));
   }, [stages]);
 
-  const handleExport = async (format: "md" | "cursorrules") => {
+  const handleExport = async (format: "md" | "cursorrules" | "txt" | "html") => {
     const fullDoc = generateFullDocument(stages as unknown as Record<string, Record<string, string>>, appName);
+
+    if (format === "txt") {
+      const txt = compileToTXT(stages as unknown as Record<string, Record<string, string>>, appName);
+      downloadBlob(txt, "text/plain", appName ? `${appName.toLowerCase().replace(/\s+/g, "-")}-brief.txt` : "project-brief.txt");
+      show("Exported as .txt");
+      return;
+    }
+    if (format === "html") {
+      const html = compileToHTML(stages as unknown as Record<string, Record<string, string>>, appName);
+      downloadBlob(html, "text/html", appName ? `${appName.toLowerCase().replace(/\s+/g, "-")}-brief.html` : "project-brief.html");
+      show("Exported as .html");
+      return;
+    }
+
     const ext = format === "cursorrules" ? ".cursorrules" : ".md";
     const filename = appName
       ? `${appName.toLowerCase().replace(/\s+/g, "-")}-brief${ext}`
       : `project-brief${ext}`;
 
-    const blob = new Blob([fullDoc], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = window.document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(fullDoc, "text/plain", filename);
     show(`Exported as ${ext}`);
+  };
+
+  const handleBackup = () => {
+    const payload = JSON.stringify(
+      { appName, stages, document: docContent, exportedAt: new Date().toISOString() },
+      null,
+      2,
+    );
+    downloadBlob(
+      payload,
+      "application/json",
+      appName
+        ? `${appName.toLowerCase().replace(/\s+/g, "-")}.fictify`
+        : "project.fictify",
+    );
+    show("Backup saved (.fictify)");
+  };
+
+  const handleImport = () => {
+    importRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const text = evt.target?.result as string;
+        const data = JSON.parse(text);
+        if (!data || typeof data !== "object") {
+          show("Invalid backup file");
+          return;
+        }
+        if (data.stages && typeof data.stages === "object") {
+          useProjectStore.setState({
+            appName: data.appName || "",
+            stages: data.stages,
+            document: data.document || "",
+            completedStages: [],
+            activeStage: 0,
+          });
+          show("Backup restored! Reloading...");
+          setTimeout(() => window.location.reload(), 800);
+        } else {
+          show("Invalid backup schema");
+        }
+      } catch {
+        show("Failed to parse backup file");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
   };
 
   const handleEdit = () => {
@@ -65,6 +128,16 @@ export default function DocumentPanel() {
     setDocument("");
     show("Document cleared");
   };
+
+  function downloadBlob(content: string, mime: string, filename: string) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = window.document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="flex flex-col h-full max-md:pb-14">
@@ -101,9 +174,22 @@ export default function DocumentPanel() {
                   <button onClick={handleClear} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors">
                     <Trash2 className="w-3 h-3" />
                   </button>
-                  <button onClick={() => handleExport("md")} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors">
+                  <button onClick={handleBackup} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors" title="Backup (.fictify)">
                     <Download className="w-3 h-3" />
+                    Backup
+                  </button>
+                  <button onClick={handleImport} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors" title="Restore from backup">
+                    <Upload className="w-3 h-3" />
+                    Restore
+                  </button>
+                  <button onClick={() => handleExport("md")} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors">
                     .md
+                  </button>
+                  <button onClick={() => handleExport("txt")} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors">
+                    .txt
+                  </button>
+                  <button onClick={() => handleExport("html")} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors">
+                    .html
                   </button>
                   <button onClick={() => handleExport("cursorrules")} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors">
                     .cursor
@@ -141,6 +227,9 @@ export default function DocumentPanel() {
           );
         })}
       </div>
+
+      {/* Hidden file input for restore */}
+      <input ref={importRef} type="file" accept=".fictify,.json" onChange={handleFileChange} className="hidden" />
 
       {/* Content area */}
       <div className="flex-1 overflow-y-auto p-5">
