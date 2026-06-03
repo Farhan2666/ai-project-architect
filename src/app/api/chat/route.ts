@@ -2,7 +2,7 @@ import { streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { SYSTEM_PROMPTS } from "@/lib/system-prompts";
+import { getPipelineSystemPrompt } from "@/utils/pipeline";
 
 const PROVIDER_CONFIG: Record<string, { type: "openai" | "anthropic" | "gemini"; baseURL?: string }> = {
   openai: { type: "openai" },
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     const config = PROVIDER_CONFIG[provider] || { type: "openai" as const };
     const effectiveBaseURL = baseURL || config.baseURL || undefined;
     const modelName = model || "gpt-4o";
-    const systemPrompt = SYSTEM_PROMPTS[stage as keyof typeof SYSTEM_PROMPTS] || SYSTEM_PROMPTS[0];
+    const systemPrompt = getPipelineSystemPrompt(stage ?? 0);
 
     let llmModel;
 
