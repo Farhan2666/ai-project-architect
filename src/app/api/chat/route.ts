@@ -75,13 +75,13 @@ export async function POST(req: Request) {
       messages,
     });
 
-    const stream = result.toTextStreamResponse();
-    const headers = new Headers(stream.headers);
+    const response = result.toUIMessageStreamResponse();
+    const headers = new Headers(response.headers);
     headers.set("X-RateLimit-Remaining", String(remaining));
 
-    return new Response(stream.body, {
-      status: stream.status,
-      statusText: stream.statusText,
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
       headers,
     });
   } catch (e: unknown) {

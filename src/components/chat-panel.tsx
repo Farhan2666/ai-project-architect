@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
-import { TextStreamChatTransport } from "ai";
+import { DefaultChatTransport } from "ai";
 import { cn } from "@/lib/utils";
 import { useApiKeyStore } from "@/store/api-key";
 import { useProjectStore, STAGES, type StageId } from "@/store/project";
@@ -72,7 +72,7 @@ export default function ChatPanel() {
   stageInfoRef.current = stageInfo;
 
   const { messages, sendMessage, regenerate, status, error } = useChat({
-    transport: new TextStreamChatTransport({
+    transport: new DefaultChatTransport({
       api: "/api/chat",
       body: () => ({
         provider: useApiKeyStore.getState().provider,
