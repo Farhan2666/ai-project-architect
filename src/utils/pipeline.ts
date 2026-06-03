@@ -1,5 +1,3 @@
-"use client";
-
 export interface PipelineContext {
   masterStructure: string;
   expandedSections: string[];
