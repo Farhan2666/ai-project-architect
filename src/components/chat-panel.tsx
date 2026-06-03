@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback, useMemo } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { cn } from "@/lib/utils";
@@ -71,17 +71,17 @@ export default function ChatPanel() {
   stageRef.current = activeStage;
   stageInfoRef.current = stageInfo;
 
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: "/api/chat",
-        body: { provider, apiKey, baseURL, model, stage: activeStage },
-      }),
-    [apiKey, provider, baseURL, model, activeStage],
-  );
-
   const { messages, sendMessage, regenerate, status, error } = useChat({
-    transport,
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      body: () => ({
+        provider: useApiKeyStore.getState().provider,
+        apiKey: useApiKeyStore.getState().apiKey,
+        baseURL: useApiKeyStore.getState().baseURL,
+        model: useApiKeyStore.getState().model,
+        stage: useProjectStore.getState().activeStage,
+      }),
+    }),
     onFinish: (result) => {
       const s = stageRef.current;
       const info = stageInfoRef.current;
