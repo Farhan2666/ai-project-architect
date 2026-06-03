@@ -29,9 +29,19 @@ function rateLimit(key: string): { allowed: boolean; remaining: number } {
   return { allowed: entry.count <= RATE_LIMIT_MAX, remaining };
 }
 
+function toCoreMessage(msg: any) {
+  if (msg.content) return { role: msg.role, content: msg.content };
+  const text = msg.parts
+    ?.filter((p: any) => p.type === "text")
+    .map((p: any) => p.text)
+    .join("") ?? "";
+  return { role: msg.role, content: text };
+}
+
 export async function POST(req: Request) {
   try {
     const { messages, provider, model, apiKey, baseURL, stage } = await req.json();
+    const coreMessages = (messages ?? []).map(toCoreMessage);
 
     if (!apiKey) {
       return new Response(JSON.stringify({ error: "API Key diperlukan" }), {
@@ -72,7 +82,7 @@ export async function POST(req: Request) {
     const result = streamText({
       model: llmModel,
       system: systemPrompt,
-      messages,
+      messages: coreMessages,
     });
 
     const response = result.toUIMessageStreamResponse();
