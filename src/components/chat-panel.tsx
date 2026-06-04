@@ -6,7 +6,7 @@ import { DefaultChatTransport } from "ai";
 import { cn } from "@/lib/utils";
 import { useApiKeyStore } from "@/store/api-key";
 import { useProjectStore, STAGES, type StageId } from "@/store/project";
-import { Send, Loader2, Key, ChevronRight, Mic, MicOff } from "lucide-react";
+import { Send, Loader2, Key, ChevronRight, Mic, MicOff, Sparkles } from "lucide-react";
 
 const STAGE_SUGGESTIONS: Record<StageId, string[]> = {
   0: ["Minimalist & Clean", "Dark Mode & Premium", "Playful & Colorful", "Corporate & Professional"],
@@ -195,6 +195,13 @@ export default function ChatPanel() {
     });
   };
 
+  const handleMagicExpand = () => {
+    if (!input.trim()) return;
+    const prompt = '[MODE MAGIC] Ide kasarku: "' + input + '"\n\nTugasmu: Kembangkan ide kasar ini secara mandiri! Analisis pasar, cari tahu aplikasi kompetitor sejenis, temukan kelebihan dan kekurangan mereka, lalu kembangkan ide kasarku ini menjadi konsep aplikasi yang jauh lebih baik dengan fitur-fitur pembeda (Unique Selling Proposition) yang inovatif.';
+    append({ role: 'user', content: prompt });
+    setInput('');
+  };
+
   const noKey = !apiKey;
 
   return (
@@ -353,6 +360,15 @@ export default function ChatPanel() {
               </button>
             )}
               <button
+                type="button"
+                onClick={handleMagicExpand}
+                disabled={isLoading || !input.trim()}
+                className="shrink-0 w-8 h-8 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 flex items-center justify-center disabled:opacity-30 transition-all duration-200"
+                title="Magic Expand (Kembangkan Ide Kasar)"
+              >
+                <Sparkles className="w-4 h-4" />
+              </button>
+              <button
                 type="submit"
                 disabled={isLoading || !input.trim()}
                 className="shrink-0 w-8 h-8 rounded-lg bg-purple-600/60 hover:bg-purple-600/80 text-white flex items-center justify-center disabled:opacity-30 transition-all duration-200"
@@ -366,5 +382,6 @@ export default function ChatPanel() {
     </div>
   );
 }
+
 
 
