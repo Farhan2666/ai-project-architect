@@ -316,7 +316,7 @@ export default function ChatPanel() {
                 </button>
               )}
             </div>
-          )}}
+          )}
 
           <div className="px-4 pb-2">
             <div className="flex overflow-x-auto whitespace-nowrap gap-2 scrollbar-none pb-2 px-1">
@@ -382,6 +382,7 @@ export default function ChatPanel() {
     </div>
   );
 }
+
 
 
 
