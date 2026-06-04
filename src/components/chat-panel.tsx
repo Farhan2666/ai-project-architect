@@ -57,7 +57,7 @@ interface SpeechRecognitionAlternative {
 export default function ChatPanel() {
   const { apiKey, provider, baseURL, model, openModal } = useApiKeyStore();
   const store = useProjectStore();
-  const { activeStage, markStageComplete, nextStage, appName, setAppName, updateStageData, appendDocument } = store;
+  const { activeStage, markStageComplete, nextStage, appName, setAppName, updateStageData, appendDocument, isStageComplete } = store;
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -189,16 +189,13 @@ export default function ChatPanel() {
 
   const handleGenerateDoc = () => {
     isGeneratingDocRef.current = true;
-    append({
-      role: 'user',
-      content: 'Tolong rangkum semua hasil diskusi kita di atas ke dalam format dokumen final untuk tahap ini. Jangan tambahkan basa-basi, langsung berikan format markdown.'
-    });
+    sendMessage({ text: 'Tolong rangkum semua hasil diskusi kita di atas ke dalam format dokumen final untuk tahap ini. Jangan tambahkan basa-basi, langsung berikan format markdown.' });
   };
 
   const handleMagicExpand = () => {
     if (!input.trim()) return;
     const prompt = '[MODE MAGIC] Ide kasarku: "' + input + '"\n\nTugasmu: Kembangkan ide kasar ini secara mandiri! Analisis pasar, cari tahu aplikasi kompetitor sejenis, temukan kelebihan dan kekurangan mereka, lalu kembangkan ide kasarku ini menjadi konsep aplikasi yang jauh lebih baik dengan fitur-fitur pembeda (Unique Selling Proposition) yang inovatif.';
-    append({ role: 'user', content: prompt });
+    sendMessage({ text: prompt });
     setInput('');
   };
 
