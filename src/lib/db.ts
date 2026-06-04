@@ -15,6 +15,7 @@ const LEGACY_KEYS = [
 interface ProjectData {
   id: string;
   document: string;
+  documents?: string;
   stages: string;
   appName: string;
   completedStages: string;
@@ -123,6 +124,7 @@ export function migrateFromLocalStorage(): boolean {
 
 export async function hydrateFromStorage(): Promise<{
   document: string;
+  documents?: Record<number, string>;
   stages: Record<string, Record<string, string>>;
   appName: string;
   completedStages: number[];
@@ -133,6 +135,7 @@ export async function hydrateFromStorage(): Promise<{
     if (!data) return null;
     return {
       document: data.document || "",
+      documents: data.documents ? JSON.parse(data.documents) : undefined,
       stages: data.stages ? JSON.parse(data.stages) : {},
       appName: data.appName || "",
       completedStages: data.completedStages ? JSON.parse(data.completedStages) : [],

@@ -11,7 +11,9 @@ import { cn } from "@/lib/utils";
 import { compileToTXT, compileToHTML } from "@/utils/sanitize";
 
 export default function DocumentPanel() {
-  const { activeStage, document: docContent, stages, appName, setDocument, setActiveStage, reset } = useProjectStore();
+  const { activeStage, documents, getMergedDocument, stages, appName, setDocument, setActiveStage, reset } = useProjectStore();
+  const [showMaster, setShowMaster] = useState(false);
+  const docContent = showMaster ? getMergedDocument() : (documents[activeStage] || "");
   const { apiKey } = useApiKeyStore();
   const { show } = useToast();
   const stageInfo = STAGES[activeStage];
@@ -19,45 +21,53 @@ export default function DocumentPanel() {
   const [editText, setEditText] = useState("");
   const importRef = useRef<HTMLInputElement>(null);
 
-  const hasData = Object.values(stages).some((s) => Object.keys(s).length > 0) || docContent.length > 0;
+  const hasData = Object.values(documents).some((d) => d && d.trim().length > 0);
 
   const stageDataEntries = useMemo(() => {
     const keys = ["brand", "prd", "srs", "sdd", "ux", "tasks"] as const;
     return keys.map((key, i) => ({
       stage: STAGES[i],
       data: stages[key],
-      hasData: Object.keys(stages[key]).length > 0,
+      hasData: Object.keys(stages[key]).length > 0 || !!(documents[i] && documents[i].trim().length > 0),
     }));
-  }, [stages]);
+  }, [stages, documents]);
 
   const handleExport = async (format: "md" | "cursorrules" | "txt" | "html") => {
-    const fullDoc = generateFullDocument(stages as unknown as Record<string, Record<string, string>>, appName);
+    const docToExport = showMaster ? getMergedDocument() : (documents[activeStage] || "");
+
+    if (!docToExport.trim()) {
+      show("Tidak ada data untuk diekspor");
+      return;
+    }
+
+    let fileContent = docToExport;
+    let mimeType = "text/plain";
+    let ext = "";
 
     if (format === "txt") {
-      const txt = compileToTXT(stages as unknown as Record<string, Record<string, string>>, appName);
-      downloadBlob(txt, "text/plain", appName ? `${appName.toLowerCase().replace(/\s+/g, "-")}-brief.txt` : "project-brief.txt");
-      show("Exported as .txt");
-      return;
-    }
-    if (format === "html") {
-      const html = compileToHTML(stages as unknown as Record<string, Record<string, string>>, appName);
-      downloadBlob(html, "text/html", appName ? `${appName.toLowerCase().replace(/\s+/g, "-")}-brief.html` : "project-brief.html");
-      show("Exported as .html");
-      return;
+      mimeType = "text/plain";
+      ext = ".txt";
+    } else if (format === "html") {
+      mimeType = "text/html";
+      ext = ".html";
+      fileContent = wrapMarkdownInHTML(docToExport, appName || "Project Brief");
+    } else {
+      mimeType = "text/plain";
+      ext = format === "cursorrules" ? ".cursorrules" : ".md";
     }
 
-    const ext = format === "cursorrules" ? ".cursorrules" : ".md";
+    const modeName = showMaster ? "master" : STAGES[activeStage].short.toLowerCase();
     const filename = appName
-      ? `${appName.toLowerCase().replace(/\s+/g, "-")}-brief${ext}`
-      : `project-brief${ext}`;
+      ? `${appName.toLowerCase().replace(/\s+/g, "-")}-${modeName}-brief${ext}`
+      : `project-${modeName}-brief${ext}`;
 
-    downloadBlob(fullDoc, "text/plain", filename);
+    downloadBlob(fileContent, mimeType, filename);
     show(`Exported as ${ext}`);
   };
 
   const handleBackup = () => {
     const payload = JSON.stringify(
-      { appName, stages, document: docContent, exportedAt: new Date().toISOString() },
+      { appName, stages, document: docContent, documents, exportedAt: new Date().toISOString() },
       null,
       2,
     );
@@ -92,6 +102,7 @@ export default function DocumentPanel() {
             appName: data.appName || "",
             stages: data.stages,
             document: data.document || "",
+            documents: data.documents || {},
             completedStages: [],
             activeStage: 0,
           });
@@ -146,10 +157,10 @@ export default function DocumentPanel() {
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-white/90 flex items-center gap-2">
             <FileText className="w-4 h-4 shrink-0" />
-            <span className="truncate">Live Document</span>
+            <span className="truncate">{showMaster ? "Master Document" : "Live Document"}</span>
           </h2>
           <p className="text-[11px] text-white/40 truncate">
-            Stage {activeStage + 1}/6: {stageInfo.label}
+            {showMaster ? "Semua tahapan proyek digabungkan" : `Stage ${activeStage + 1}/6: ${stageInfo.label}`}
           </p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0 ml-2">
@@ -167,13 +178,25 @@ export default function DocumentPanel() {
                 </>
               ) : (
                 <>
-                  <button onClick={handleEdit} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors">
-                    <Edit3 className="w-3 h-3" />
-                    Edit
-                  </button>
-                  <button onClick={handleClear} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors">
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+                  {!showMaster && (
+                    <button
+                      onClick={() => setShowMaster(true)}
+                      className="text-[11px] px-2.5 py-1.5 rounded-lg bg-purple-600/80 hover:bg-purple-600 text-white flex items-center gap-1 transition-colors font-medium"
+                    >
+                      🚀 Selesaikan Proyek
+                    </button>
+                  )}
+                  {!showMaster && (
+                    <button onClick={handleEdit} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors">
+                      <Edit3 className="w-3 h-3" />
+                      Edit
+                    </button>
+                  )}
+                  {!showMaster && (
+                    <button onClick={handleClear} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
                   <button onClick={handleBackup} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors" title="Backup (.fictify)">
                     <Download className="w-3 h-3" />
                     Backup
@@ -210,11 +233,12 @@ export default function DocumentPanel() {
             <button
               key={s.id}
               onClick={() => {
+                setShowMaster(false);
                 if (isComplete) setActiveStage(s.id);
               }}
               className={cn(
                 "h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-medium transition-all shrink-0",
-                s.id === activeStage
+                !showMaster && s.id === activeStage
                   ? "bg-purple-600/60 text-white ring-2 ring-purple-400/30"
                   : isComplete
                   ? "bg-purple-600/20 text-purple-300/70 hover:bg-purple-600/30 cursor-pointer"
@@ -226,6 +250,20 @@ export default function DocumentPanel() {
             </button>
           );
         })}
+        {hasData && (
+          <button
+            onClick={() => setShowMaster(true)}
+            className={cn(
+              "h-7 px-3 rounded-full flex items-center justify-center text-[10px] font-semibold transition-all shrink-0 border ml-auto",
+              showMaster
+                ? "bg-indigo-600/70 text-white ring-2 ring-indigo-400/30 border-indigo-500/20"
+                : "bg-indigo-950/40 text-indigo-300 hover:bg-indigo-950/60 cursor-pointer border-indigo-500/20"
+            )}
+            title="Master Document (Selesaikan Proyek)"
+          >
+            🚀 Master
+          </button>
+        )}
       </div>
 
       {/* Hidden file input for restore */}
@@ -262,32 +300,41 @@ export default function DocumentPanel() {
   );
 }
 
-function generateFullDocument(
-  stages: Record<string, Record<string, string>>,
-  appName: string
-): string {
-  const title = appName || "AI Project Architect Brief";
-  const now = new Date().toISOString().split("T")[0];
-  const stageLabels = ["Brand & Identity", "PRD", "SRS", "SDD", "UI/UX Flow", "Task Breakdown"];
-  const keys = ["brand", "prd", "srs", "sdd", "ux", "tasks"];
-  let doc = `# ${title}\n\n**Generated:** ${now}\n\n---\n\n`;
+function wrapMarkdownInHTML(md: string, title: string): string {
+  let html = md
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/~~(.*?)~~/g, '<del>$1</del>')
+    .replace(/^- (.*$)/gim, '<li>$1</li>')
+    .replace(/\n/g, '<br />');
 
-  keys.forEach((key, i) => {
-    const data = stages[key];
-    const summary = data["summary"];
-    if (summary) {
-      doc += `## ${stageLabels[i]}\n\n${summary}\n\n---\n\n`;
-    } else {
-      const entries = Object.entries(data);
-      if (entries.length > 0) {
-        doc += `## ${stageLabels[i]}\n\n`;
-        entries.forEach(([k, v]) => {
-          doc += `- **${k}:** ${v}\n`;
-        });
-        doc += `\n---\n\n`;
-      }
-    }
-  });
+  html = html.replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
 
-  return doc;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${title}</title>
+<style>
+  body { background:#0f172a; color:#e2e8f0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; max-width:800px; margin:2rem auto; padding:0 1.5rem; line-height:1.7; }
+  h1 { font-size:1.75rem; margin-top:2rem; margin-bottom:1rem; color:#f1f5f9; border-bottom:1px solid #334155; padding-bottom:0.5rem; }
+  h2 { font-size:1.4rem; margin-top:1.5rem; margin-bottom:0.75rem; color:#f1f5f9; border-bottom:1px solid #1e293b; padding-bottom:0.25rem; }
+  h3 { font-size:1.2rem; margin-top:1.25rem; margin-bottom:0.5rem; color:#cbd5e1; }
+  strong { color:#f8fafc; }
+  ul { margin-left:1.5rem; margin-bottom:1rem; }
+  li { margin-bottom:0.25rem; }
+  hr { border: 0; border-top: 1px solid #334155; margin: 2rem 0; }
+</style>
+</head>
+<body>
+  ${html}
+</body>
+</html>`;
 }

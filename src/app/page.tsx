@@ -27,6 +27,7 @@ export default function Home() {
       if (data) {
         hydrate({
           document: data.document,
+          documents: data.documents,
           stages: data.stages as any,
           appName: data.appName,
           completedStages: data.completedStages as any,
