@@ -3,6 +3,8 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { useApiKeyStore } from "@/store/api-key";
 import { useProjectStore, STAGES, type StageId } from "@/store/project";
@@ -52,6 +54,20 @@ interface SpeechRecognitionResult {
 interface SpeechRecognitionAlternative {
   transcript: string;
   confidence: number;
+}
+
+function getMessageDisplayContent(m: any): string {
+  const rawText = m.parts && m.parts.length > 0
+    ? m.parts.filter((p: any) => p.type === "text").map((p: any) => p.text).join("")
+    : m.content || "";
+
+  if (rawText.startsWith('[MODE MAGIC] Ide kasarku: "')) {
+    const match = rawText.match(/^\[MODE MAGIC\] Ide kasarku: "([\s\S]*?)"\n\nTugasmu:/);
+    if (match && match[1]) {
+      return '✨ **[Magic Expand]** _' + match[1] + '_';
+    }
+  }
+  return rawText;
 }
 
 export default function ChatPanel() {
@@ -262,10 +278,11 @@ export default function ChatPanel() {
                         : "bg-white/5 text-white/80 border border-white/5"
                     }`}
                   >
-                    {m.parts
-                      ?.filter((p: any) => p.type === "text")
-                      .map((p: any) => p.text)
-                      .join("")}
+                    <article className="prose prose-sm prose-invert max-w-none break-words">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {getMessageDisplayContent(m)}
+                      </ReactMarkdown>
+                    </article>
                   </div>
                 </div>
               ))}
