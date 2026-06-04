@@ -1,4 +1,4 @@
-import { streamText } from "ai";
+﻿import { streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -19,6 +19,11 @@ const rateMap = new Map<string, { count: number; resetAt: number }>();
 
 function rateLimit(key: string): { allowed: boolean; remaining: number } {
   const now = Date.now();
+  if (rateMap.size > 1000) {
+    for (const [k, v] of rateMap.entries()) {
+      if (now > v.resetAt) rateMap.delete(k);
+    }
+  }
   const entry = rateMap.get(key);
   if (!entry || now > entry.resetAt) {
     rateMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
@@ -101,3 +106,4 @@ export async function POST(req: Request) {
     });
   }
 }
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
@@ -61,8 +61,16 @@ export default function ChatPanel() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const isGeneratingDocRef = useRef(false);
   const [input, setInput] = useState("");
   const [isListening, setIsListening] = useState(false);
+  const [hasMicSupport, setHasMicSupport] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setHasMicSupport(!!(window.SpeechRecognition || window.webkitSpeechRecognition));
+    }
+  }, []);
   const stageInfo = STAGES[activeStage];
   const suggestions = STAGE_SUGGESTIONS[activeStage];
 
@@ -94,14 +102,17 @@ export default function ChatPanel() {
       if (s === 0) {
         const lines = text.split("\n");
         for (const line of lines) {
-          const match = line.match(/(?:app|application|project)\s*(?:name)?[:\-–]\s*(.+)/i);
+          const match = line.match(/(?:app|application|project)\s*(?:name)?[:\-â€“]\s*(.+)/i);
           if (match) setAppName(match[1].trim());
         }
       }
 
-      appendDocument(`\n\n## ${info.label}\n\n${text}`);
-      updateStageData(stageKey as "brand" | "prd" | "srs" | "sdd" | "ux" | "tasks", "summary", text);
-      markStageComplete(s);
+      if (isGeneratingDocRef.current) {
+        appendDocument(`\n\n## ${info.label}\n\n${text}`);
+        updateStageData(stageKey as "brand" | "prd" | "srs" | "sdd" | "ux" | "tasks", "summary", text);
+        markStageComplete(s);
+        isGeneratingDocRef.current = false;
+      }
     },
   });
 
@@ -176,6 +187,14 @@ export default function ChatPanel() {
     };
   }, []);
 
+  const handleGenerateDoc = () => {
+    isGeneratingDocRef.current = true;
+    append({
+      role: 'user',
+      content: 'Tolong rangkum semua hasil diskusi kita di atas ke dalam format dokumen final untuk tahap ini. Jangan tambahkan basa-basi, langsung berikan format markdown.'
+    });
+  };
+
   const noKey = !apiKey;
 
   return (
@@ -185,7 +204,7 @@ export default function ChatPanel() {
           <div className="min-w-0">
             <h1 className="text-lg font-semibold text-white/90 truncate">AI Project Architect</h1>
             <p className="text-xs text-white/50 truncate">
-              {appName ? `${appName} — ` : ""}
+              {appName ? `${appName} â€” ` : ""}
               Stage {activeStage + 1}/6: {stageInfo.label}
             </p>
           </div>
@@ -272,18 +291,25 @@ export default function ChatPanel() {
           )}
 
           {messages.filter((m) => m.role !== "system").length > 0 && !isLoading && (
-            <div className="flex justify-end px-4 pb-1">
+            <div className="flex justify-end px-4 pb-1 gap-2">
               <button
-                onClick={() => {
-                  if (activeStage < 5) nextStage();
-                }}
-                className="text-xs text-white/50 hover:text-white/80 flex items-center gap-1 transition-colors"
+                onClick={handleGenerateDoc}
+                className="text-xs px-3 py-1.5 bg-purple-600/60 hover:bg-purple-600/80 rounded-md text-white transition-colors"
               >
-                {activeStage < 5 ? `Next: ${STAGES[activeStage + 1].label}` : "All stages complete!"}
-                <ChevronRight className="w-3 h-3" />
+                📝 Finalisasi & Buat Dokumen
               </button>
+              {isStageComplete(activeStage) && activeStage < 5 && (
+                <button
+                  onClick={() => {
+                    nextStage();
+                  }}
+                  className="text-xs text-white/50 hover:text-white/80 flex items-center gap-1 transition-colors"
+                >
+                  Next: {STAGES[activeStage + 1].label} <ChevronRight className="w-3 h-3 inline" />
+                </button>
+              )}
             </div>
-          )}
+          )}}
 
           <div className="px-4 pb-2">
             <div className="flex overflow-x-auto whitespace-nowrap gap-2 scrollbar-none pb-2 px-1">
@@ -311,6 +337,7 @@ export default function ChatPanel() {
                 disabled={isLoading}
                 className="flex-1 bg-transparent text-sm text-white/90 placeholder-white/30 outline-none min-w-0 disabled:opacity-50"
               />
+              {hasMicSupport && (
               <button
                 type="button"
                 onClick={toggleListening}
@@ -324,6 +351,7 @@ export default function ChatPanel() {
               >
                 {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
               </button>
+            )}
               <button
                 type="submit"
                 disabled={isLoading || !input.trim()}
@@ -338,3 +366,5 @@ export default function ChatPanel() {
     </div>
   );
 }
+
+

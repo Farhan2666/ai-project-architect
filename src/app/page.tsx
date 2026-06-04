@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import SplitScreen from "@/components/split-screen";
 import ByokModal from "@/components/byok-modal";
 import ChatPanel from "@/components/chat-panel";
@@ -10,6 +10,8 @@ import { useProjectStore } from "@/store/project";
 import { migrateFromLocalStorage, hydrateFromStorage } from "@/lib/db";
 
 export default function Home() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const loadKey = useApiKeyStore((s) => s.loadKey);
   const hydrate = useProjectStore((s) => s.hydrate);
   const hydrated = useProjectStore((s) => s.hydrated);
@@ -55,6 +57,8 @@ export default function Home() {
     });
   }, [hydrate, hydrated]);
 
+  if (!mounted) return <div className="min-h-screen bg-[#0a0a0a]"></div>;
+
   return (
     <>
       <ByokModal />
@@ -65,3 +69,4 @@ export default function Home() {
     </>
   );
 }
+
