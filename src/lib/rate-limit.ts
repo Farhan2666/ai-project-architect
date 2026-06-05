@@ -33,7 +33,7 @@ export async function rateLimit(
       const result = await upstashRatelimit.limit(key);
       return { allowed: result.success, remaining: result.remaining };
     } catch {
-      // fallback ke in-memory
+      // fallback
     }
   }
 

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { dexieStorage, deleteProjectData } from "@/lib/db";
+import { setDocumentData, deleteProjectData } from "@/lib/db";
+import { getDocumentData } from "@/lib/db";
 
 export const STAGES = [
   { id: 0, label: "Brand & Identity", short: "Brand" },
@@ -39,7 +40,7 @@ interface ProjectState {
   markStageComplete: (stage: StageId) => void;
   isStageComplete: (stage: StageId) => boolean;
   reset: () => void;
-  hydrate: (data: Partial<ProjectState>) => void;
+  hydrateDocument: () => Promise<void>;
 }
 
 const INITIAL_STAGES: StageData = {
@@ -51,27 +52,6 @@ const INITIAL_STAGES: StageData = {
   tasks: {},
 };
 
-function deepMerge(target: any, source: any): any {
-  const output = { ...target };
-  for (const key of Object.keys(source)) {
-    const val = source[key];
-    if (val !== undefined) {
-      if (
-        val !== null &&
-        typeof val === "object" &&
-        !Array.isArray(val) &&
-        typeof output[key] === "object" &&
-        output[key] !== null
-      ) {
-        output[key] = deepMerge(output[key], val);
-      } else {
-        output[key] = val;
-      }
-    }
-  }
-  return output;
-}
-
 export const useProjectStore = create<ProjectState>()(
   persist(
     (set, get) => ({
@@ -82,11 +62,7 @@ export const useProjectStore = create<ProjectState>()(
       completedStages: [],
       hydrated: false,
 
-      hydrate: () => set({ hydrated: true }),
-
-      setAppName: (name) => {
-        set({ appName: name });
-      },
+      setAppName: (name) => set({ appName: name }),
 
       setActiveStage: (stage) => set({ activeStage: stage }),
 
@@ -111,10 +87,13 @@ export const useProjectStore = create<ProjectState>()(
 
       setDocument: (doc) => {
         set({ document: doc });
+        setDocumentData(doc);
       },
 
       appendDocument: (text) => {
-        set((state) => ({ document: state.document + "\n" + text }));
+        const doc = get().document + "\n" + text;
+        set({ document: doc });
+        setDocumentData(doc);
       },
 
       markStageComplete: (stage) => {
@@ -137,20 +116,23 @@ export const useProjectStore = create<ProjectState>()(
         });
         deleteProjectData();
       },
+
+      hydrateDocument: async () => {
+        const doc = await getDocumentData();
+        if (doc) set({ document: doc });
+      },
     }),
     {
-      name: "ai-project-architect-project",
-      storage: dexieStorage,
-      merge: (persisted, current) => deepMerge(current, persisted),
+      name: "ai-project-architect-ui",
       partialize: (state) => ({
         activeStage: state.activeStage,
         appName: state.appName,
         stages: state.stages,
-        document: state.document,
         completedStages: state.completedStages,
       }),
       onRehydrateStorage: () => () => {
         useProjectStore.setState({ hydrated: true });
+        useProjectStore.getState().hydrateDocument();
       },
     },
   ),

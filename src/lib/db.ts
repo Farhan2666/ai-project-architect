@@ -1,5 +1,4 @@
 import Dexie, { type EntityTable } from "dexie";
-import { projectDataSchema, stageDataSchema, type StageData, type StageId } from "./schemas";
 
 const DB_NAME = "ai-project-architect";
 const DB_VERSION = 2;
@@ -12,7 +11,6 @@ interface ProjectRecord {
   appName: string;
   completedStages: string;
   activeStage: number;
-  migratedAt?: number;
 }
 
 class ProjectDatabase extends Dexie {
@@ -28,23 +26,19 @@ class ProjectDatabase extends Dexie {
 
 const db = new ProjectDatabase();
 
-export async function getProjectData(): Promise<ProjectRecord | null> {
+export async function getDocumentData(): Promise<string> {
   try {
     const row = await db.projectData.get("default");
-    if (!row) return null;
-    const parsed = projectDataSchema.parse(row);
-    return parsed;
+    return row?.document ?? "";
   } catch {
-    return null;
+    return "";
   }
 }
 
-export async function setProjectData(
-  data: Omit<ProjectRecord, "id">,
-): Promise<void> {
+export async function setDocumentData(document: string): Promise<void> {
   try {
     const existing = await db.projectData.get("default");
-    const payload: ProjectRecord = {
+    await db.projectData.put({
       ...(existing ?? {
         id: "default",
         document: "",
@@ -53,13 +47,11 @@ export async function setProjectData(
         completedStages: "[]",
         activeStage: 0,
       }),
-      ...data,
+      document,
       id: "default",
-    };
-    projectDataSchema.parse(payload);
-    await db.projectData.put(payload);
+    });
   } catch {
-    // silent fail — localStorage fallback masih berfungsi
+    // silent
   }
 }
 
@@ -67,103 +59,9 @@ export async function deleteProjectData(): Promise<void> {
   try {
     await db.projectData.delete("default");
   } catch {
-    // silent fail
+    // silent
   }
 }
-
-// --- Zustand async storage adapter ---
-
-export const dexieStorage = {
-  getItem: async (name: string): Promise<any> => {
-    if (name === "ai-project-architect-project") {
-      const row = await getProjectData();
-      if (!row) return null;
-      return {
-        state: {
-          activeStage: row.activeStage,
-          appName: row.appName,
-          stages: JSON.parse(row.stages),
-          document: row.document,
-          completedStages: JSON.parse(row.completedStages),
-        },
-        version: 0,
-      };
-    }
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem(name);
-  },
-  setItem: async (name: string, value: any): Promise<void> => {
-    if (name === "ai-project-architect-project") {
-      try {
-        const state = typeof value === "string" ? JSON.parse(value).state : value.state ?? value;
-        if (!state) return;
-        await setProjectData({
-          document: state.document ?? "",
-          stages: JSON.stringify(state.stages ?? {}),
-          appName: state.appName ?? "",
-          completedStages: JSON.stringify(state.completedStages ?? []),
-          activeStage: state.activeStage ?? 0,
-        });
-      } catch {
-        // silent
-      }
-      return;
-    }
-    if (typeof window === "undefined") return;
-    localStorage.setItem(name, value);
-  },
-  removeItem: async (name: string): Promise<void> => {
-    if (name === "ai-project-architect-project") {
-      await deleteProjectData();
-      return;
-    }
-    if (typeof window === "undefined") return;
-    localStorage.removeItem(name);
-  },
-};
-
-// --- Migrasi dari localStorage legacy ke Dexie ---
-
-const LEGACY_KEYS = [
-  "ai-project-architect-project",
-  "ai-project-architect-api-key",
-  "ai-project-architect-provider",
-  "ai-project-architect-baseurl",
-  "ai-project-architect-model",
-] as const;
-
-export async function migrateFromLocalStorage(): Promise<boolean> {
-  if (typeof window === "undefined") return false;
-  const migrated = localStorage.getItem("__migrated_to_idb");
-  if (migrated === "true") return false;
-
-  const legacy = localStorage.getItem("ai-project-architect-project");
-  if (!legacy) return false;
-
-  try {
-    const parsed = JSON.parse(legacy);
-    const { state } = parsed;
-    if (!state) return false;
-
-    await setProjectData({
-      document: state.document || "",
-      stages: JSON.stringify(state.stages || {}),
-      appName: state.appName || "",
-      completedStages: JSON.stringify((state.completedStages || []).map((n: any) => typeof n === "number" ? n : parseInt(n, 10))),
-      activeStage: state.activeStage ?? 0,
-      migratedAt: Date.now(),
-    });
-
-    localStorage.setItem("__migrated_to_idb", "true");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export { LEGACY_KEYS };
-
-// --- StorageManager API ---
 
 export async function requestPersistentStorage(): Promise<boolean> {
   if (typeof navigator === "undefined" || !navigator.storage?.persist) {
