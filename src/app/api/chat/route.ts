@@ -67,7 +67,6 @@ export async function POST(req: Request) {
       model: llmModel,
       system: systemPrompt,
       messages: coreMessages,
-      maxSteps: 5,
     });
 
     const response = result.toUIMessageStreamResponse();
