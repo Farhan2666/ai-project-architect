@@ -3,10 +3,26 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { useApiKeyStore } from "@/store/api-key";
 import { useProjectStore, STAGES, type StageId } from "@/store/project";
-import { Send, Loader2, Key, ChevronRight, Mic, MicOff } from "lucide-react";
+import { Send, Loader2, Key, ChevronRight, Mic, MicOff, Sparkles } from "lucide-react";
+
+function getMessageDisplayContent(m: any): string {
+  const rawText = m.parts && m.parts.length > 0
+    ? m.parts.filter((p: any) => p.type === "text").map((p: any) => p.text).join("")
+    : m.content || "";
+
+  if (rawText.startsWith('[MODE MAGIC] Ide kasarku: "')) {
+    const match = rawText.match(/^\[MODE MAGIC\] Ide kasarku: "([\s\S]*?)"\n\nTugasmu:/);
+    if (match && match[1]) {
+      return "✨ **Magic Expand** _" + match[1] + "_";
+    }
+  }
+  return rawText;
+}
 
 const STAGE_SUGGESTIONS: Record<StageId, string[]> = {
   0: ["Minimalist & Clean", "Dark Mode & Premium", "Playful & Colorful", "Corporate & Professional"],
@@ -57,12 +73,14 @@ interface SpeechRecognitionAlternative {
 export default function ChatPanel() {
   const { apiKey, provider, baseURL, model, openModal } = useApiKeyStore();
   const store = useProjectStore();
-  const { activeStage, markStageComplete, nextStage, appName, setAppName, updateStageData, appendDocument } = store;
+  const { activeStage, markStageComplete, nextStage, appName, setAppName, updateStageData, appendDocument, isStageComplete } = store;
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const isGeneratingDocRef = useRef(false);
   const [input, setInput] = useState("");
   const [isListening, setIsListening] = useState(false);
+  const [hasMicSupport, setHasMicSupport] = useState(true);
   const stageInfo = STAGES[activeStage];
   const suggestions = STAGE_SUGGESTIONS[activeStage];
 
@@ -104,18 +122,19 @@ export default function ChatPanel() {
         }
       }
 
-      const { document: currentDoc } = useProjectStore.getState();
-      const stageHeading = `\n\n## ${info.label}`;
-      if (!currentDoc.includes(stageHeading)) {
-        appendDocument(`${stageHeading}\n\n${text}`);
-      } else {
-        appendDocument(`\n\n${text}`);
-      }
-
-      updateStageData(stageKey as "brand" | "prd" | "srs" | "sdd" | "ux" | "tasks", "summary", text);
-
-      if (result.finishReason === "tool-calls") {
+      if (isGeneratingDocRef.current) {
+        const { document: currentDoc } = useProjectStore.getState();
+        const stageHeading = `\n\n## ${info.label}`;
+        if (!currentDoc.includes(stageHeading)) {
+          appendDocument(`${stageHeading}\n\n${text}`);
+        } else {
+          appendDocument(`\n\n${text}`);
+        }
+        updateStageData(stageKey as "brand" | "prd" | "srs" | "sdd" | "ux" | "tasks", "summary", text);
         markStageComplete(s);
+        isGeneratingDocRef.current = false;
+      } else {
+        updateStageData(stageKey as "brand" | "prd" | "srs" | "sdd" | "ux" | "tasks", "summary", text);
       }
     },
   });
@@ -188,10 +207,25 @@ export default function ChatPanel() {
   }, [isListening]);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      setHasMicSupport(!!(window.SpeechRecognition || window.webkitSpeechRecognition));
+    }
     return () => {
       recognitionRef.current?.stop();
     };
   }, []);
+
+  const handleGenerateDoc = () => {
+    isGeneratingDocRef.current = true;
+    sendMessage({ text: "Tolong rangkum semua hasil diskusi kita di atas ke dalam format dokumen final untuk tahap ini. Jangan tambahkan basa-basi, langsung berikan format markdown." });
+  };
+
+  const handleMagicExpand = () => {
+    if (!input.trim()) return;
+    const prompt = '[MODE MAGIC] Ide kasarku: "' + input + '"\n\nTugasmu: Kembangkan ide kasar ini secara mandiri! Analisis pasar, cari tahu aplikasi kompetitor sejenis, temukan kelebihan dan kekurangan mereka, lalu kembangkan ide kasarku ini menjadi konsep aplikasi yang jauh lebih baik dengan fitur-fitur pembeda (Unique Selling Proposition) yang inovatif.';
+    sendMessage({ text: prompt });
+    setInput("");
+  };
 
   const noKey = !apiKey;
 
@@ -256,10 +290,11 @@ export default function ChatPanel() {
                         : "bg-white/5 text-white/80 border border-white/5"
                     }`}
                   >
-                    {m.parts
-                      ?.filter((p: any) => p.type === "text")
-                      .map((p: any) => p.text)
-                      .join("")}
+                    <article className="prose prose-sm prose-invert max-w-none break-words">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {getMessageDisplayContent(m)}
+                      </ReactMarkdown>
+                    </article>
                   </div>
                 </div>
               ))}
@@ -291,20 +326,20 @@ export default function ChatPanel() {
           {messages.filter((m) => m.role !== "system").length > 0 && !isLoading && (
             <div className="flex justify-end px-4 pb-1 gap-2">
               <button
-                onClick={() => markStageComplete(activeStage)}
-                className="text-xs text-purple-400/60 hover:text-purple-400/90 flex items-center gap-1 transition-colors"
+                onClick={handleGenerateDoc}
+                className="text-xs px-3 py-1.5 bg-purple-600/60 hover:bg-purple-600/80 rounded-md text-white transition-colors"
               >
-                Mark Complete
+                Finalisasi & Buat Dokumen
               </button>
-              <button
-                onClick={() => {
-                  if (activeStage < 5) nextStage();
-                }}
-                className="text-xs text-white/50 hover:text-white/80 flex items-center gap-1 transition-colors"
-              >
-                {activeStage < 5 ? `Next: ${STAGES[activeStage + 1].label}` : "All stages complete!"}
-                <ChevronRight className="w-3 h-3" />
-              </button>
+              {isStageComplete(activeStage) && activeStage < 5 && (
+                <button
+                  onClick={() => nextStage()}
+                  className="text-xs text-white/50 hover:text-white/80 flex items-center gap-1 transition-colors"
+                >
+                  Next: {STAGES[activeStage + 1].label}
+                  <ChevronRight className="w-3 h-3" />
+                </button>
+              )}
             </div>
           )}
 
@@ -334,18 +369,29 @@ export default function ChatPanel() {
                 disabled={isLoading}
                 className="flex-1 bg-transparent text-sm text-white/90 placeholder-white/30 outline-none min-w-0 disabled:opacity-50"
               />
+              {hasMicSupport && (
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  className={cn(
+                    "shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200",
+                    isListening
+                      ? "text-red-400 bg-red-500/10 shadow-lg shadow-red-500/20"
+                      : "text-white/40 hover:text-white/70 hover:bg-white/5",
+                  )}
+                  title={isListening ? "Stop listening" : "Voice input"}
+                >
+                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              )}
               <button
                 type="button"
-                onClick={toggleListening}
-                className={cn(
-                  "shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200",
-                  isListening
-                    ? "text-red-400 bg-red-500/10 shadow-lg shadow-red-500/20"
-                    : "text-white/40 hover:text-white/70 hover:bg-white/5",
-                )}
-                title={isListening ? "Stop listening" : "Voice input"}
+                onClick={handleMagicExpand}
+                disabled={isLoading || !input.trim()}
+                className="shrink-0 w-8 h-8 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 flex items-center justify-center disabled:opacity-30 transition-all duration-200"
+                title="Magic Expand (Kembangkan Ide Kasar)"
               >
-                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                <Sparkles className="w-4 h-4" />
               </button>
               <button
                 type="submit"

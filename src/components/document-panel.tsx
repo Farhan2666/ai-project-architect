@@ -208,11 +208,9 @@ export default function DocumentPanel() {
           const entry = stageDataEntries[s.id];
           const isComplete = entry?.hasData;
           return (
-            <button
-              key={s.id}
-              onClick={() => {
-                if (isComplete) setActiveStage(s.id);
-              }}
+              <button
+                key={s.id}
+                onClick={() => setActiveStage(s.id)}
               className={cn(
                 "h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-medium transition-all shrink-0",
                 s.id === activeStage
