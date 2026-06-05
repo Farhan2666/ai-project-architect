@@ -1,23 +1,19 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import SplitScreen from "@/components/split-screen";
 import ByokModal from "@/components/byok-modal";
 import ChatPanel from "@/components/chat-panel";
 import DocumentPanel from "@/components/document-panel";
 import { useApiKeyStore } from "@/store/api-key";
 import { useProjectStore } from "@/store/project";
-import { hydrateFromStorage, requestPersistentStorage } from "@/lib/db";
+import { requestPersistentStorage } from "@/lib/db";
 
 export default function Home() {
-  const hydrate = useProjectStore((s) => s.hydrate);
   const hydrated = useProjectStore((s) => s.hydrated);
-  const persistedHydrated = useRef(false);
 
   useEffect(() => {
-    const encrypted = typeof window !== "undefined"
-      ? localStorage.getItem("ai-project-architect-api-key-enc")
-      : null;
+    const encrypted = localStorage.getItem("ai-project-architect-api-key-enc");
     if (encrypted) {
       useApiKeyStore.getState().openModal();
     } else {
@@ -26,31 +22,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (persistedHydrated.current) return;
-    persistedHydrated.current = true;
-
-    hydrateFromStorage().then((data) => {
-      if (data) {
-        hydrate(data as any);
-      } else {
-        const legacyRaw = typeof window !== "undefined"
-          ? localStorage.getItem("ai-project-architect-project")
-          : null;
-        if (legacyRaw) {
-          try {
-            const legacy = JSON.parse(legacyRaw);
-            if (legacy?.state) {
-              hydrate(legacy.state as any);
-              return;
-            }
-          } catch { /* ignore */ }
-        }
-        hydrate({ hydrated: true });
-      }
-    });
-
+    if (!hydrated) return;
     requestPersistentStorage();
-  }, [hydrate]);
+  }, [hydrated]);
 
   if (!hydrated) {
     return (

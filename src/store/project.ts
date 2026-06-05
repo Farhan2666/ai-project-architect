@@ -82,12 +82,7 @@ export const useProjectStore = create<ProjectState>()(
       completedStages: [],
       hydrated: false,
 
-      hydrate: (data) =>
-        set((state) => ({
-          ...state,
-          ...data,
-          hydrated: true,
-        })),
+      hydrate: () => set({ hydrated: true }),
 
       setAppName: (name) => {
         set({ appName: name });
@@ -146,7 +141,6 @@ export const useProjectStore = create<ProjectState>()(
     {
       name: "ai-project-architect-project",
       storage: dexieStorage,
-      skipHydration: true,
       merge: (persisted, current) => deepMerge(current, persisted),
       partialize: (state) => ({
         activeStage: state.activeStage,
@@ -155,6 +149,9 @@ export const useProjectStore = create<ProjectState>()(
         document: state.document,
         completedStages: state.completedStages,
       }),
+      onRehydrateStorage: () => () => {
+        useProjectStore.setState({ hydrated: true });
+      },
     },
   ),
 );

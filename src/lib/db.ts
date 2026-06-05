@@ -161,29 +161,6 @@ export async function migrateFromLocalStorage(): Promise<boolean> {
   }
 }
 
-export async function hydrateFromStorage(): Promise<{
-  document: string;
-  stages: StageData;
-  appName: string;
-  completedStages: StageId[];
-  activeStage: StageId;
-} | null> {
-  try {
-    const row = await getProjectData();
-    if (!row) return null;
-    const parsed = projectDataSchema.parse(row);
-    return {
-      document: parsed.document || "",
-      stages: stageDataSchema.parse(JSON.parse(parsed.stages)),
-      appName: parsed.appName || "",
-      completedStages: (JSON.parse(parsed.completedStages) as number[]).map((n) => n as StageId),
-      activeStage: (parsed.activeStage ?? 0) as StageId,
-    };
-  } catch {
-    return null;
-  }
-}
-
 export { LEGACY_KEYS };
 
 // --- StorageManager API ---
