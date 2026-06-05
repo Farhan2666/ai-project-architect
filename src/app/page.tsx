@@ -6,7 +6,7 @@ import ByokModal from "@/components/byok-modal";
 import ChatPanel from "@/components/chat-panel";
 import DocumentPanel from "@/components/document-panel";
 import { useApiKeyStore } from "@/store/api-key";
-import { useProjectStore } from "@/store/project";
+import { useProjectStore, type StageData } from "@/store/project";
 import { hydrateFromStorage, requestPersistentStorage } from "@/lib/db";
 
 export default function Home() {
@@ -33,7 +33,7 @@ export default function Home() {
       if (data) {
         hydrate({
           document: data.document,
-          stages: data.stages,
+          stages: data.stages as StageData,
           appName: data.appName,
           completedStages: data.completedStages,
           activeStage: data.activeStage,
@@ -48,7 +48,7 @@ export default function Home() {
             if (legacy?.state) {
               hydrate({
                 document: legacy.state.document || "",
-                stages: legacy.state.stages || {},
+                stages: (legacy.state.stages || {}) as StageData,
                 appName: legacy.state.appName || "",
                 completedStages: legacy.state.completedStages || [],
                 activeStage: legacy.state.activeStage ?? 0,
