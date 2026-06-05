@@ -29,7 +29,6 @@ interface ProjectState {
   stages: StageData;
   document: string;
   completedStages: StageId[];
-  hydrated: boolean;
   setAppName: (name: string) => void;
   setActiveStage: (stage: StageId) => void;
   nextStage: () => void;
@@ -60,7 +59,6 @@ export const useProjectStore = create<ProjectState>()(
       stages: structuredClone(INITIAL_STAGES),
       document: "",
       completedStages: [],
-      hydrated: false,
 
       setAppName: (name) => set({ appName: name }),
 
@@ -131,7 +129,6 @@ export const useProjectStore = create<ProjectState>()(
         completedStages: state.completedStages,
       }),
       onRehydrateStorage: () => () => {
-        useProjectStore.setState({ hydrated: true });
         useProjectStore.getState().hydrateDocument();
       },
     },
