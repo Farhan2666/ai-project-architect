@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     const config = PROVIDER_CONFIG[provider] || { type: "openai" as const };
     const effectiveBaseURL = baseURL || config.baseURL || undefined;
     const modelName = model || "gpt-4o";
-    const lastUserMsg = coreMessages.filter((m) => m.role === "user").pop()?.content ?? "";
+    const lastUserMsg = coreMessages.filter((m: { role: string }) => m.role === "user").pop()?.content ?? "";
     const isMagicMode = lastUserMsg.startsWith("[MODE MAGIC]");
     const systemPrompt = getPipelineSystemPrompt(stage ?? 0, isMagicMode);
 
