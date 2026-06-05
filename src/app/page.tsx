@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+
+export const dynamic = "force-dynamic";
 import SplitScreen from "@/components/split-screen";
 import ByokModal from "@/components/byok-modal";
 import ChatPanel from "@/components/chat-panel";
