@@ -7,7 +7,6 @@ import ChatPanel from "@/components/chat-panel";
 import DocumentPanel from "@/components/document-panel";
 import { useApiKeyStore } from "@/store/api-key";
 import { useProjectStore } from "@/store/project";
-import type { StageData, StageId } from "@/lib/schemas";
 import { hydrateFromStorage, requestPersistentStorage } from "@/lib/db";
 
 export default function Home() {
@@ -32,13 +31,7 @@ export default function Home() {
 
     hydrateFromStorage().then((data) => {
       if (data) {
-        hydrate({
-          document: data.document,
-          stages: data.stages as StageData,
-          appName: data.appName,
-          completedStages: data.completedStages as StageId[],
-          activeStage: data.activeStage as StageId,
-        });
+        hydrate(data as any);
       } else {
         const legacyRaw = typeof window !== "undefined"
           ? localStorage.getItem("ai-project-architect-project")
@@ -47,12 +40,7 @@ export default function Home() {
           try {
             const legacy = JSON.parse(legacyRaw);
             if (legacy?.state) {
-              hydrate({
-                document: legacy.state.document || "",
-                stages: (legacy.state.stages || {}) as StageData,
-                appName: legacy.state.appName || "",
-                completedStages: (legacy.state.completedStages || []) as StageId[],
-                activeStage: (legacy.state.activeStage ?? 0) as StageId,
+              hydrate(legacy.state as any);
               });
               return;
             }
