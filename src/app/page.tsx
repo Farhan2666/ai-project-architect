@@ -41,7 +41,6 @@ export default function Home() {
             const legacy = JSON.parse(legacyRaw);
             if (legacy?.state) {
               hydrate(legacy.state as any);
-              });
               return;
             }
           } catch { /* ignore */ }
