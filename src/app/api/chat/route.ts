@@ -1,4 +1,4 @@
-import { streamText, type CoreMessage } from "ai";
+import { streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -14,7 +14,7 @@ const PROVIDER_CONFIG: Record<string, { type: "openai" | "anthropic" | "gemini";
   groq: { type: "openai", baseURL: "https://api.groq.com/openai/v1" },
 };
 
-function toCoreMessage(msg: any): CoreMessage {
+function toCoreMessage(msg: any): { role: string; content: string } {
   const text = msg.parts
     ?.filter((p: any) => p.type === "text")
     .map((p: any) => p.text)
