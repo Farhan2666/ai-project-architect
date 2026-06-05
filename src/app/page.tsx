@@ -1,40 +1,44 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import SplitScreen from "@/components/split-screen";
 import ByokModal from "@/components/byok-modal";
 import ChatPanel from "@/components/chat-panel";
 import DocumentPanel from "@/components/document-panel";
 import { useApiKeyStore } from "@/store/api-key";
 import { useProjectStore } from "@/store/project";
-import { migrateFromLocalStorage, hydrateFromStorage } from "@/lib/db";
+import { hydrateFromStorage, requestPersistentStorage } from "@/lib/db";
 
 export default function Home() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const loadKey = useApiKeyStore((s) => s.loadKey);
   const hydrate = useProjectStore((s) => s.hydrate);
   const hydrated = useProjectStore((s) => s.hydrated);
+  const persistedHydrated = useRef(false);
 
   useEffect(() => {
-    loadKey();
-  }, [loadKey]);
+    const encrypted = typeof window !== "undefined"
+      ? localStorage.getItem("ai-project-architect-api-key-enc")
+      : null;
+    if (encrypted) {
+      useApiKeyStore.getState().openModal();
+    } else {
+      useApiKeyStore.getState().openModal();
+    }
+  }, []);
 
   useEffect(() => {
-    if (hydrated) return;
-    migrateFromLocalStorage();
+    if (persistedHydrated.current) return;
+    persistedHydrated.current = true;
+
     hydrateFromStorage().then((data) => {
       if (data) {
         hydrate({
           document: data.document,
-          documents: data.documents,
-          stages: data.stages as any,
+          stages: data.stages,
           appName: data.appName,
-          completedStages: data.completedStages as any,
-          activeStage: data.activeStage as any,
+          completedStages: data.completedStages,
+          activeStage: data.activeStage,
         });
       } else {
-        // Fallback: try legacy localStorage key
         const legacyRaw = typeof window !== "undefined"
           ? localStorage.getItem("ai-project-architect-project")
           : null;
@@ -51,23 +55,30 @@ export default function Home() {
               });
               return;
             }
-          } catch { /* ignore parse failure */ }
+          } catch { /* ignore */ }
         }
         hydrate({ hydrated: true });
       }
     });
-  }, [hydrate, hydrated]);
 
-  if (!mounted) return <div className="min-h-screen bg-[#0a0a0a]"></div>;
+    requestPersistentStorage();
+  }, [hydrate]);
+
+  if (!hydrated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-black">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-purple-500/30 border-t-purple-500 animate-spin" />
+          <p className="text-sm text-white/40">Loading workspace...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
       <ByokModal />
-      <SplitScreen
-        left={<ChatPanel />}
-        right={<DocumentPanel />}
-      />
+      <SplitScreen left={<ChatPanel />} right={<DocumentPanel />} />
     </>
   );
 }
-

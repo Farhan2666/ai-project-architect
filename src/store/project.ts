@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { setProjectData, deleteProjectData } from "@/lib/db";
+import { dexieStorage, deleteProjectData } from "@/lib/db";
 
 export const STAGES = [
   { id: 0, label: "Brand & Identity", short: "Brand" },
@@ -27,7 +27,6 @@ interface ProjectState {
   appName: string;
   stages: StageData;
   document: string;
-  documents: Record<number, string>;
   completedStages: StageId[];
   hydrated: boolean;
   setAppName: (name: string) => void;
@@ -35,9 +34,8 @@ interface ProjectState {
   nextStage: () => void;
   prevStage: () => void;
   updateStageData: (stage: keyof StageData, key: string, value: string) => void;
-  setDocument: (doc: string, stageId?: number) => void;
-  appendDocument: (text: string, stageId?: number) => void;
-  getMergedDocument: () => string;
+  setDocument: (doc: string) => void;
+  appendDocument: (text: string) => void;
   markStageComplete: (stage: StageId) => void;
   isStageComplete: (stage: StageId) => boolean;
   reset: () => void;
@@ -53,24 +51,25 @@ const INITIAL_STAGES: StageData = {
   tasks: {},
 };
 
-const INITIAL_DOCUMENTS: Record<number, string> = {
-  0: "",
-  1: "",
-  2: "",
-  3: "",
-  4: "",
-  5: "",
-};
-
-function persistLargeData(state: ProjectState) {
-  setProjectData({
-    document: state.document,
-    documents: JSON.stringify(state.documents),
-    stages: JSON.stringify(state.stages),
-    appName: state.appName,
-    completedStages: JSON.stringify(state.completedStages),
-    activeStage: state.activeStage,
-  });
+function deepMerge<T>(target: T, source: Partial<T>): T {
+  const output = { ...target };
+  for (const key of Object.keys(source) as (keyof T)[]) {
+    const val = source[key];
+    if (val !== undefined) {
+      if (
+        val !== null &&
+        typeof val === "object" &&
+        !Array.isArray(val) &&
+        typeof output[key] === "object" &&
+        output[key] !== null
+      ) {
+        (output as any)[key] = deepMerge(output[key] as any, val as any);
+      } else {
+        output[key] = val;
+      }
+    }
+  }
+  return output;
 }
 
 export const useProjectStore = create<ProjectState>()(
@@ -80,7 +79,6 @@ export const useProjectStore = create<ProjectState>()(
       appName: "",
       stages: structuredClone(INITIAL_STAGES),
       document: "",
-      documents: structuredClone(INITIAL_DOCUMENTS),
       completedStages: [],
       hydrated: false,
 
@@ -88,13 +86,11 @@ export const useProjectStore = create<ProjectState>()(
         set((state) => ({
           ...state,
           ...data,
-          documents: data.documents || state.documents,
           hydrated: true,
         })),
 
       setAppName: (name) => {
         set({ appName: name });
-        persistLargeData(get());
       },
 
       setActiveStage: (stage) => set({ activeStage: stage }),
@@ -116,50 +112,14 @@ export const useProjectStore = create<ProjectState>()(
             [stage]: { ...state.stages[stage], [key]: value },
           },
         }));
-        persistLargeData(get());
       },
 
-      setDocument: (doc, stageId) => {
-        const targetStage = stageId !== undefined ? stageId : get().activeStage;
-        set((state) => ({
-          documents: {
-            ...state.documents,
-            [targetStage]: doc,
-          },
-        }));
-        persistLargeData(get());
+      setDocument: (doc) => {
+        set({ document: doc });
       },
 
-      appendDocument: (text, stageId) => {
-        const targetStage = stageId !== undefined ? stageId : get().activeStage;
-        const current = get().documents[targetStage] || "";
-        set((state) => ({
-          documents: {
-            ...state.documents,
-            [targetStage]: current + (current ? "\n" : "") + text,
-          },
-        }));
-        persistLargeData(get());
-      },
-
-      getMergedDocument: () => {
-        const { documents, appName } = get();
-        const title = appName || "AI Project Architect Brief";
-        const now = new Date().toISOString().split("T")[0];
-        let doc = `# ${title}\n\n**Generated:** ${now}\n\n---\n\n`;
-
-        STAGES.forEach((stage) => {
-          const content = documents[stage.id]?.trim();
-          doc += `## Stage ${stage.id + 1}: ${stage.label}\n\n`;
-          if (content) {
-            doc += `${content}\n\n`;
-          } else {
-            doc += `*Belum ada data untuk stage ini.*\n\n`;
-          }
-          doc += `---\n\n`;
-        });
-
-        return doc;
+      appendDocument: (text) => {
+        set((state) => ({ document: state.document + "\n" + text }));
       },
 
       markStageComplete: (stage) => {
@@ -168,7 +128,6 @@ export const useProjectStore = create<ProjectState>()(
             ? state.completedStages
             : [...state.completedStages, stage],
         }));
-        persistLargeData(get());
       },
 
       isStageComplete: (stage) => get().completedStages.includes(stage),
@@ -179,19 +138,23 @@ export const useProjectStore = create<ProjectState>()(
           appName: "",
           stages: structuredClone(INITIAL_STAGES),
           document: "",
-          documents: structuredClone(INITIAL_DOCUMENTS),
           completedStages: [],
         });
         deleteProjectData();
       },
     }),
     {
-      name: "ai-project-architect-ui",
+      name: "ai-project-architect-project",
+      storage: dexieStorage,
+      skipHydration: true,
+      merge: (persisted, current) => deepMerge(current, persisted as Partial<ProjectState>),
       partialize: (state) => ({
         activeStage: state.activeStage,
         appName: state.appName,
+        stages: state.stages,
+        document: state.document,
         completedStages: state.completedStages,
       }),
-    }
-  )
+    },
+  ),
 );

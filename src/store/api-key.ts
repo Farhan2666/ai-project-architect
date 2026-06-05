@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { encryptApiKey, decryptApiKey } from "@/lib/crypto";
 
 export type AIProvider = "openai" | "anthropic" | "gemini" | "openrouter" | "deepseek" | "groq" | "custom";
 
@@ -73,18 +74,20 @@ interface ApiKeyState {
   baseURL: string;
   model: string;
   isModalOpen: boolean;
+  pinSet: boolean;
   setProvider: (provider: AIProvider) => void;
   setApiKey: (key: string) => void;
   setBaseURL: (url: string) => void;
   setModel: (model: string) => void;
-  saveKey: (provider: AIProvider, key: string, baseURL?: string, model?: string) => void;
-  loadKey: () => boolean;
+  saveKey: (pin: string, provider: AIProvider, key: string, baseURL?: string, model?: string) => Promise<void>;
+  loadKey: (pin: string) => Promise<boolean>;
   clearKey: () => void;
   openModal: () => void;
   closeModal: () => void;
+  getDecryptedKey: (pin: string) => Promise<string>;
 }
 
-const STORAGE_KEY = "ai-project-architect-api-key";
+const STORAGE_KEY = "ai-project-architect-api-key-enc";
 const STORAGE_PROVIDER_KEY = "ai-project-architect-provider";
 const STORAGE_BASEURL_KEY = "ai-project-architect-baseurl";
 const STORAGE_MODEL_KEY = "ai-project-architect-model";
@@ -93,12 +96,13 @@ function getProviderInfo(prov: AIProvider): ProviderInfo {
   return PROVIDER_LIST.find((p) => p.id === prov) || PROVIDER_LIST[0];
 }
 
-export const useApiKeyStore = create<ApiKeyState>((set) => ({
+export const useApiKeyStore = create<ApiKeyState>((set, get) => ({
   provider: "openai",
   apiKey: "",
   baseURL: "",
   model: "gpt-4o",
-  isModalOpen: false,
+  isModalOpen: true,
+  pinSet: false,
 
   setProvider: (provider) => set((state) => {
     const info = getProviderInfo(provider);
@@ -113,34 +117,49 @@ export const useApiKeyStore = create<ApiKeyState>((set) => ({
   setBaseURL: (baseURL) => set({ baseURL }),
   setModel: (model) => set({ model }),
 
-  saveKey: (provider, key, baseURL, model) => {
+  saveKey: async (pin, provider, key, baseURL, model) => {
     const info = getProviderInfo(provider);
     const url = baseURL ?? info.baseURL;
     const mdl = model ?? info.defaultModel;
-    localStorage.setItem(STORAGE_KEY, key);
+
+    const encrypted = await encryptApiKey(pin, key);
+    localStorage.setItem(STORAGE_KEY, encrypted);
     localStorage.setItem(STORAGE_PROVIDER_KEY, provider);
     localStorage.setItem(STORAGE_BASEURL_KEY, url);
     localStorage.setItem(STORAGE_MODEL_KEY, mdl);
-    set({ provider, apiKey: key, baseURL: url, model: mdl, isModalOpen: false });
+    set({ provider, apiKey: key, baseURL: url, model: mdl, isModalOpen: false, pinSet: true });
   },
 
-  loadKey: () => {
+  loadKey: async (pin) => {
     if (typeof window === "undefined") return false;
-    const key = localStorage.getItem(STORAGE_KEY);
+    const encrypted = localStorage.getItem(STORAGE_KEY);
     const provider = localStorage.getItem(STORAGE_PROVIDER_KEY) as AIProvider | null;
     const baseURL = localStorage.getItem(STORAGE_BASEURL_KEY) || "";
     const model = localStorage.getItem(STORAGE_MODEL_KEY) || "";
-    if (key && provider) {
-      const info = getProviderInfo(provider);
-      set({
-        apiKey: key, provider, baseURL,
-        model: model || info.defaultModel,
-        isModalOpen: false,
-      });
-      return true;
+    if (encrypted && provider) {
+      try {
+        const decrypted = await decryptApiKey(pin, encrypted);
+        const info = getProviderInfo(provider);
+        set({
+          apiKey: decrypted, provider, baseURL,
+          model: model || info.defaultModel,
+          isModalOpen: false,
+          pinSet: true,
+        });
+        return true;
+      } catch {
+        set({ isModalOpen: true, pinSet: false });
+        return false;
+      }
     }
     set({ isModalOpen: true });
     return false;
+  },
+
+  getDecryptedKey: async (pin: string) => {
+    const encrypted = localStorage.getItem(STORAGE_KEY);
+    if (!encrypted) return "";
+    return decryptApiKey(pin, encrypted);
   },
 
   clearKey: () => {
@@ -148,7 +167,7 @@ export const useApiKeyStore = create<ApiKeyState>((set) => ({
     localStorage.removeItem(STORAGE_PROVIDER_KEY);
     localStorage.removeItem(STORAGE_BASEURL_KEY);
     localStorage.removeItem(STORAGE_MODEL_KEY);
-    set({ apiKey: "", provider: "openai", baseURL: "", model: "", isModalOpen: true });
+    set({ apiKey: "", provider: "openai", baseURL: "", model: "", isModalOpen: true, pinSet: false });
   },
 
   openModal: () => set({ isModalOpen: true }),

@@ -1,8 +1,9 @@
-﻿import { streamText } from "ai";
+import { streamText, type CoreMessage } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { getPipelineSystemPrompt } from "@/utils/pipeline";
+import { rateLimit } from "@/lib/rate-limit";
 
 const PROVIDER_CONFIG: Record<string, { type: "openai" | "anthropic" | "gemini"; baseURL?: string }> = {
   openai: { type: "openai" },
@@ -13,33 +14,12 @@ const PROVIDER_CONFIG: Record<string, { type: "openai" | "anthropic" | "gemini";
   groq: { type: "openai", baseURL: "https://api.groq.com/openai/v1" },
 };
 
-const RATE_LIMIT_WINDOW = 60_000;
-const RATE_LIMIT_MAX = 30;
-const rateMap = new Map<string, { count: number; resetAt: number }>();
-
-function rateLimit(key: string): { allowed: boolean; remaining: number } {
-  const now = Date.now();
-  if (rateMap.size > 1000) {
-    for (const [k, v] of rateMap.entries()) {
-      if (now > v.resetAt) rateMap.delete(k);
-    }
-  }
-  const entry = rateMap.get(key);
-  if (!entry || now > entry.resetAt) {
-    rateMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
-    return { allowed: true, remaining: RATE_LIMIT_MAX - 1 };
-  }
-  entry.count++;
-  const remaining = Math.max(0, RATE_LIMIT_MAX - entry.count);
-  return { allowed: entry.count <= RATE_LIMIT_MAX, remaining };
-}
-
-function toCoreMessage(msg: any) {
+function toCoreMessage(msg: any): CoreMessage {
   const text = msg.parts
     ?.filter((p: any) => p.type === "text")
     .map((p: any) => p.text)
     .join("") ?? msg.content ?? "";
-  return { role: msg.role, content: text };
+  return { role: msg.role ?? "user", content: text };
 }
 
 export async function POST(req: Request) {
@@ -56,7 +36,7 @@ export async function POST(req: Request) {
 
     const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
     const rlKey = `${ip}:${apiKey.slice(0, 8)}`;
-    const { allowed, remaining } = rateLimit(rlKey);
+    const { allowed, remaining } = await rateLimit(rlKey);
 
     if (!allowed) {
       return new Response(JSON.stringify({ error: "Too many requests. Silakan tunggu." }), {
@@ -68,18 +48,31 @@ export async function POST(req: Request) {
     const config = PROVIDER_CONFIG[provider] || { type: "openai" as const };
     const effectiveBaseURL = baseURL || config.baseURL || undefined;
     const modelName = model || "gpt-4o";
+    const systemPrompt = getPipelineSystemPrompt(stage ?? 0);
 
-    const lastMessage = coreMessages[coreMessages.length - 1];
-    const isMagicMode = lastMessage && typeof lastMessage.content === 'string' && lastMessage.content.includes('[MODE MAGIC]');
-    const systemPrompt = getPipelineSystemPrompt(stage ?? 0, isMagicMode);
+    const stageCompleteTool = {
+      type: "function" as const,
+      name: "finalize_stage",
+      description: "Call this when the current stage is complete and ready to move to the next stage.",
+      parameters: {
+        type: "object",
+        properties: {
+          summary: {
+            type: "string",
+            description: "Brief summary of what was accomplished in this stage.",
+          },
+        },
+        required: ["summary"],
+      },
+    };
 
     let llmModel;
 
     if (config.type === "anthropic") {
-      const client = createAnthropic({ apiKey });
+      const client = createAnthropic({ apiKey, baseURL: effectiveBaseURL });
       llmModel = client(modelName);
     } else if (config.type === "gemini") {
-      const client = createGoogleGenerativeAI({ apiKey });
+      const client = createGoogleGenerativeAI({ apiKey, baseURL: effectiveBaseURL });
       llmModel = client(modelName);
     } else {
       const client = createOpenAI({ apiKey, baseURL: effectiveBaseURL });
@@ -90,6 +83,10 @@ export async function POST(req: Request) {
       model: llmModel,
       system: systemPrompt,
       messages: coreMessages,
+      tools: {
+        finalize_stage: stageCompleteTool,
+      },
+      maxSteps: 5,
     });
 
     const response = result.toUIMessageStreamResponse();
@@ -109,4 +106,3 @@ export async function POST(req: Request) {
     });
   }
 }
-
