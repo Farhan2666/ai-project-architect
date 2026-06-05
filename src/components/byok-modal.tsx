@@ -48,8 +48,8 @@ export default function ByokModal() {
   const [showPin, setShowPin] = useState(false);
   const [localError, setLocalError] = useState("");
   const [pin, setPin] = useState("");
-  const [pinMode, setPinMode] = useState<"unlock" | "setup">(
-    localStorage.getItem("ai-project-architect-api-key-enc") ? "unlock" : "setup"
+  const [pinMode, setPinMode] = useState<"unlock" | "setup">(() =>
+    typeof window !== "undefined" && localStorage.getItem("ai-project-architect-api-key-enc") ? "unlock" : "setup"
   );
   const formRef = useRef<HTMLFormElement>(null);
 
