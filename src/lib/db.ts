@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
-import { projectDataSchema, type StageData } from "./schemas";
+import { projectDataSchema, stageDataSchema, type StageData } from "./schemas";
 
 const DB_NAME = "ai-project-architect";
 const DB_VERSION = 2;
@@ -175,7 +175,7 @@ export async function hydrateFromStorage(): Promise<{
     const parsed = projectDataSchema.parse(row);
     return {
       document: parsed.document || "",
-      stages: JSON.parse(parsed.stages),
+      stages: stageDataSchema.parse(JSON.parse(parsed.stages)),
       appName: parsed.appName || "",
       completedStages: JSON.parse(parsed.completedStages),
       activeStage: parsed.activeStage ?? 0,
