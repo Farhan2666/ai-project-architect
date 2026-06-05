@@ -1,4 +1,5 @@
-import { streamText } from "ai";
+import { streamText, tool } from "ai";
+import { z } from "zod";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -50,22 +51,6 @@ export async function POST(req: Request) {
     const modelName = model || "gpt-4o";
     const systemPrompt = getPipelineSystemPrompt(stage ?? 0);
 
-    const stageCompleteTool = {
-      type: "function" as const,
-      name: "finalize_stage",
-      description: "Call this when the current stage is complete and ready to move to the next stage.",
-      parameters: {
-        type: "object",
-        properties: {
-          summary: {
-            type: "string",
-            description: "Brief summary of what was accomplished in this stage.",
-          },
-        },
-        required: ["summary"],
-      },
-    };
-
     let llmModel;
 
     if (config.type === "anthropic") {
@@ -84,7 +69,12 @@ export async function POST(req: Request) {
       system: systemPrompt,
       messages: coreMessages,
       tools: {
-        finalize_stage: stageCompleteTool,
+        finalize_stage: tool({
+          description: "Call this when the current stage is complete and ready to move to the next stage.",
+          parameters: z.object({
+            summary: z.string().describe("Brief summary of what was accomplished in this stage."),
+          }),
+        }),
       },
       maxSteps: 5,
     });
