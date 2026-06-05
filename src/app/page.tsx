@@ -6,7 +6,8 @@ import ByokModal from "@/components/byok-modal";
 import ChatPanel from "@/components/chat-panel";
 import DocumentPanel from "@/components/document-panel";
 import { useApiKeyStore } from "@/store/api-key";
-import { useProjectStore, type StageData } from "@/store/project";
+import { useProjectStore } from "@/store/project";
+import type { StageData, StageId } from "@/lib/schemas";
 import { hydrateFromStorage, requestPersistentStorage } from "@/lib/db";
 
 export default function Home() {
@@ -35,8 +36,8 @@ export default function Home() {
           document: data.document,
           stages: data.stages as StageData,
           appName: data.appName,
-          completedStages: data.completedStages,
-          activeStage: data.activeStage,
+          completedStages: data.completedStages as StageId[],
+          activeStage: data.activeStage as StageId,
         });
       } else {
         const legacyRaw = typeof window !== "undefined"
@@ -50,8 +51,8 @@ export default function Home() {
                 document: legacy.state.document || "",
                 stages: (legacy.state.stages || {}) as StageData,
                 appName: legacy.state.appName || "",
-                completedStages: legacy.state.completedStages || [],
-                activeStage: legacy.state.activeStage ?? 0,
+                completedStages: (legacy.state.completedStages || []) as StageId[],
+                activeStage: (legacy.state.activeStage ?? 0) as StageId,
               });
               return;
             }

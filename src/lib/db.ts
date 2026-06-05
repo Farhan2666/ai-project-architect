@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
-import { projectDataSchema, stageDataSchema, type StageData } from "./schemas";
+import { projectDataSchema, stageDataSchema, type StageData, type StageId } from "./schemas";
 
 const DB_NAME = "ai-project-architect";
 const DB_VERSION = 2;
@@ -150,7 +150,7 @@ export async function migrateFromLocalStorage(): Promise<boolean> {
       document: state.document || "",
       stages: JSON.stringify(state.stages || {}),
       appName: state.appName || "",
-      completedStages: JSON.stringify(state.completedStages || []),
+      completedStages: JSON.stringify((state.completedStages || []).map((n: any) => typeof n === "number" ? n : parseInt(n, 10))),
       activeStage: state.activeStage ?? 0,
       migratedAt: Date.now(),
     });
@@ -166,8 +166,8 @@ export async function hydrateFromStorage(): Promise<{
   document: string;
   stages: StageData;
   appName: string;
-  completedStages: number[];
-  activeStage: number;
+  completedStages: StageId[];
+  activeStage: StageId;
 } | null> {
   try {
     const row = await getProjectData();
@@ -177,7 +177,7 @@ export async function hydrateFromStorage(): Promise<{
       document: parsed.document || "",
       stages: stageDataSchema.parse(JSON.parse(parsed.stages)),
       appName: parsed.appName || "",
-      completedStages: JSON.parse(parsed.completedStages),
+      completedStages: (JSON.parse(parsed.completedStages) as number[]).map((n) => n as StageId),
       activeStage: parsed.activeStage ?? 0,
     };
   } catch {
