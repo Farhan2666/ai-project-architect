@@ -74,11 +74,11 @@ export async function deleteProjectData(): Promise<void> {
 // --- Zustand async storage adapter ---
 
 export const dexieStorage = {
-  getItem: async (name: string): Promise<string | null> => {
+  getItem: async (name: string): Promise<any> => {
     if (name === "ai-project-architect-project") {
       const row = await getProjectData();
       if (!row) return null;
-      return JSON.stringify({
+      return {
         state: {
           activeStage: row.activeStage,
           appName: row.appName,
@@ -87,16 +87,15 @@ export const dexieStorage = {
           completedStages: JSON.parse(row.completedStages),
         },
         version: 0,
-      });
+      };
     }
     if (typeof window === "undefined") return null;
     return localStorage.getItem(name);
   },
-  setItem: async (name: string, value: string): Promise<void> => {
+  setItem: async (name: string, value: any): Promise<void> => {
     if (name === "ai-project-architect-project") {
       try {
-        const parsed = JSON.parse(value);
-        const state = parsed?.state;
+        const state = typeof value === "string" ? JSON.parse(value).state : value.state ?? value;
         if (!state) return;
         await setProjectData({
           document: state.document ?? "",
