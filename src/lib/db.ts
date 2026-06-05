@@ -178,7 +178,7 @@ export async function hydrateFromStorage(): Promise<{
       stages: stageDataSchema.parse(JSON.parse(parsed.stages)),
       appName: parsed.appName || "",
       completedStages: (JSON.parse(parsed.completedStages) as number[]).map((n) => n as StageId),
-      activeStage: parsed.activeStage ?? 0,
+      activeStage: (parsed.activeStage ?? 0) as StageId,
     };
   } catch {
     return null;
