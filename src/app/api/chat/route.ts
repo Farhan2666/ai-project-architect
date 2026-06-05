@@ -1,5 +1,4 @@
-import { streamText, tool } from "ai";
-import { z } from "zod";
+import { streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -68,14 +67,6 @@ export async function POST(req: Request) {
       model: llmModel,
       system: systemPrompt,
       messages: coreMessages,
-      tools: {
-        finalize_stage: tool({
-          description: "Call this when the current stage is complete and ready to move to the next stage.",
-          parameters: z.object({
-            summary: z.string().describe("Brief summary of what was accomplished in this stage."),
-          }),
-        }),
-      },
       maxSteps: 5,
     });
 
