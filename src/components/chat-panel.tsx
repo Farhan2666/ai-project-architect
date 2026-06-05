@@ -10,7 +10,7 @@ import { useApiKeyStore } from "@/store/api-key";
 import { useProjectStore, STAGES, type StageId } from "@/store/project";
 import { Send, Loader2, Key, ChevronRight, Mic, MicOff, Sparkles } from "lucide-react";
 
-function getMessageDisplayContent(m: { parts?: { type: string; text: string }[]; content?: string }): string {
+function getMessageDisplayContent(m: any): string {
   const rawText = m.parts && m.parts.length > 0
     ? m.parts.filter((p: any) => p.type === "text").map((p: any) => p.text).join("")
     : m.content || "";
