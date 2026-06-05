@@ -63,7 +63,6 @@ export default function ChatPanel() {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [input, setInput] = useState("");
   const [isListening, setIsListening] = useState(false);
-  const [tokenUsage, setTokenUsage] = useState<{ prompt: number; completion: number } | null>(null);
   const stageInfo = STAGES[activeStage];
   const suggestions = STAGE_SUGGESTIONS[activeStage];
 
@@ -85,7 +84,7 @@ export default function ChatPanel() {
         stage: useProjectStore.getState().activeStage,
       }),
     }),
-    onFinish: (result, { usage } = {}) => {
+    onFinish: (result: any) => {
       const s = stageRef.current;
       const info = stageInfoRef.current;
       const stageKey = ["brand", "prd", "srs", "sdd", "ux", "tasks"][s];
@@ -117,13 +116,6 @@ export default function ChatPanel() {
 
       if (result.finishReason === "tool-calls") {
         markStageComplete(s);
-      }
-
-      if (usage?.promptTokens || usage?.completionTokens) {
-        setTokenUsage({
-          prompt: usage.promptTokens ?? 0,
-          completion: usage.completionTokens ?? 0,
-        });
       }
     },
   });
@@ -222,12 +214,6 @@ export default function ChatPanel() {
             <Key className="w-4 h-4" />
           </button>
         </div>
-        {tokenUsage && (
-          <div className="flex gap-3 mt-1.5 text-[10px] text-white/30">
-            <span>Prompt: {tokenUsage.prompt} tok</span>
-            <span>Completion: {tokenUsage.completion} tok</span>
-          </div>
-        )}
       </header>
 
       {noKey ? (
