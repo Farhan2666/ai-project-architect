@@ -51,9 +51,9 @@ const INITIAL_STAGES: StageData = {
   tasks: {},
 };
 
-function deepMerge<T>(target: T, source: Partial<T>): T {
+function deepMerge(target: any, source: any): any {
   const output = { ...target };
-  for (const key of Object.keys(source) as (keyof T)[]) {
+  for (const key of Object.keys(source)) {
     const val = source[key];
     if (val !== undefined) {
       if (
@@ -63,7 +63,7 @@ function deepMerge<T>(target: T, source: Partial<T>): T {
         typeof output[key] === "object" &&
         output[key] !== null
       ) {
-        (output as any)[key] = deepMerge(output[key] as any, val as any);
+        output[key] = deepMerge(output[key], val);
       } else {
         output[key] = val;
       }
@@ -147,7 +147,7 @@ export const useProjectStore = create<ProjectState>()(
       name: "ai-project-architect-project",
       storage: dexieStorage,
       skipHydration: true,
-      merge: (persisted, current) => deepMerge(current, persisted as Partial<ProjectState>),
+      merge: (persisted, current) => deepMerge(current, persisted),
       partialize: (state) => ({
         activeStage: state.activeStage,
         appName: state.appName,
