@@ -18,7 +18,7 @@ function hex2buf(hex: string): ArrayBuffer {
 }
 
 function str2buf(str: string): ArrayBuffer {
-  return new TextEncoder().encode(str).buffer;
+  return new TextEncoder().encode(str).buffer as ArrayBuffer;
 }
 
 function buf2str(buf: ArrayBuffer): string {
@@ -31,7 +31,7 @@ async function deriveKey(
 ): Promise<CryptoKey> {
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
-    str2buf(pin),
+    str2buf(pin) as BufferSource,
     "PBKDF2",
     false,
     ["deriveKey"],
@@ -40,14 +40,14 @@ async function deriveKey(
   return crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt,
+      salt: salt as BufferSource,
       iterations: PBKDF2_ITERATIONS,
       hash: "SHA-256",
     },
     keyMaterial,
-    { name: "AES-GCM", length: KEY_LENGTH },
+    { name: "AES-GCM", length: KEY_LENGTH } as AesDerivedKeyParams,
     false,
-    ["encrypt", "decrypt"],
+    ["encrypt", "decrypt"] as KeyUsage[],
   );
 }
 
@@ -60,9 +60,9 @@ export async function encryptApiKey(
   const key = await deriveKey(pin, salt);
 
   const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
+    { name: "AES-GCM", iv: iv as BufferSource },
     key,
-    str2buf(plaintext),
+    str2buf(plaintext) as BufferSource,
   );
 
   const saltHex = buf2hex(salt.buffer);
@@ -87,9 +87,9 @@ export async function decryptApiKey(
   const key = await deriveKey(pin, salt);
 
   const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv },
+    { name: "AES-GCM", iv: iv as BufferSource },
     key,
-    data,
+    data as BufferSource,
   );
 
   return buf2str(decrypted);
