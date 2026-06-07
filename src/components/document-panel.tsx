@@ -7,7 +7,7 @@ import { useProjectStore, STAGES, type StageData, type StageId } from "@/store/p
 import { useApiKeyStore } from "@/store/api-key";
 import { useToast } from "@/components/toast";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { FileText, Download, Edit3, Eye, Trash2, Upload, FileJson, FileArchive, RefreshCw } from "lucide-react";
+import { FileText, Download, Edit3, Eye, Trash2, Upload, FileJson, FileArchive, RefreshCw, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { compileToTXT, compileToHTML } from "@/utils/sanitize";
 
@@ -270,6 +270,13 @@ export default function DocumentPanel() {
     show("Document cleared");
   };
 
+  const handleReset = () => {
+    if (!confirm("Reset seluruh project? Semua stage dan dokumen akan hilang.")) return;
+    localStorage.removeItem(BACKUP_KEY);
+    reset();
+    show("Project reset");
+  };
+
   function downloadBlob(content: string, mime: string, filename: string) {
     const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
@@ -315,6 +322,10 @@ export default function DocumentPanel() {
                     </button>
                     <button onClick={handleClear} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors" title="Clear document">
                       <Trash2 className="w-3 h-3" />
+                    </button>
+                    <button onClick={handleReset} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-red-950/50 hover:bg-red-950/70 text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors" title="Reset seluruh project">
+                      <RotateCcw className="w-3 h-3" />
+                      Reset
                     </button>
                     <button onClick={handleBackup} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors" title="Backup (.fictify)">
                       <Download className="w-3 h-3" />
