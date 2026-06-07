@@ -12,7 +12,9 @@ import { useProjectStore } from "@/store/project";
 export default function Home() {
   useEffect(() => {
     const encrypted = localStorage.getItem("ai-project-architect-api-key-enc");
-    useApiKeyStore.getState().openModal();
+    if (!encrypted) {
+      useApiKeyStore.getState().openModal();
+    }
   }, []);
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,7 +53,12 @@ export default function ByokModal() {
   );
 
   const hasNoKey = !apiKey.trim() && isModalOpen;
-  const noPinMode = true;
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("ai-project-architect-api-key-enc")) {
+      useApiKeyStore.getState().loadKey("");
+    }
+  }, []);
 
   return (
     <Dialog
