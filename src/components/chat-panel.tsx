@@ -94,13 +94,15 @@ export default function ChatPanel() {
     id: `stage-${activeStage}`,
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      body: () => ({
-        provider: useApiKeyStore.getState().provider,
-        apiKey: useApiKeyStore.getState().apiKey,
-        baseURL: useApiKeyStore.getState().baseURL,
-        model: useApiKeyStore.getState().model,
-        stage: useProjectStore.getState().activeStage,
-      }),
+      headers: () => {
+        const s = useApiKeyStore.getState();
+        return {
+          "x-api-key": s.apiKey,
+          "x-provider": s.provider,
+          "x-base-url": s.baseURL,
+          "x-model": s.model,
+        };
+      },
     }),
     onFinish: (result: any) => {
       const s = stageRef.current;
@@ -132,7 +134,6 @@ export default function ChatPanel() {
         }
         updateStageData(stageKey as "brand" | "prd" | "srs" | "sdd" | "ux" | "tasks", "summary", text);
         markStageComplete(s);
-        isGeneratingDocRef.current = false;
       } else {
         updateStageData(stageKey as "brand" | "prd" | "srs" | "sdd" | "ux" | "tasks", "summary", text);
       }
@@ -183,7 +184,7 @@ export default function ChatPanel() {
     const recognition = new SpeechRecognitionAPI();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = "en-US";
+    recognition.lang = typeof navigator !== "undefined" ? (navigator.language || "en-US") : "en-US";
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let finalTranscript = "";

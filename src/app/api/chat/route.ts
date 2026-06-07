@@ -4,28 +4,23 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { getPipelineSystemPrompt } from "@/utils/pipeline";
 import { rateLimit } from "@/lib/rate-limit";
-
-const PROVIDER_CONFIG: Record<string, { type: "openai" | "anthropic" | "gemini"; baseURL?: string }> = {
-  openai: { type: "openai" },
-  anthropic: { type: "anthropic" },
-  gemini: { type: "gemini" },
-  openrouter: { type: "openai", baseURL: "https://openrouter.ai/api/v1" },
-  deepseek: { type: "openai", baseURL: "https://api.deepseek.com/v1" },
-  groq: { type: "openai", baseURL: "https://api.groq.com/openai/v1" },
-};
-
-function toCoreMessage(msg: any): { role: string; content: string } {
-  const text = msg.parts
-    ?.filter((p: any) => p.type === "text")
-    .map((p: any) => p.text)
-    .join("") ?? msg.content ?? "";
-  return { role: msg.role ?? "user", content: text };
-}
+import { getProviderConfig } from "@/lib/provider-registry";
 
 export async function POST(req: Request) {
   try {
-    const { messages, provider, model, apiKey, baseURL, stage } = await req.json();
-    const coreMessages = (messages ?? []).map(toCoreMessage);
+    const apiKey = req.headers.get("x-api-key") || "";
+    const provider = req.headers.get("x-provider") || "openai";
+    const baseURL = req.headers.get("x-base-url") || undefined;
+    const model = req.headers.get("x-model") || "gpt-4o";
+
+    const { messages, stage } = await req.json();
+    const coreMessages = (messages ?? []).map((msg: any) => {
+      const text = msg.parts
+        ?.filter((p: any) => p.type === "text")
+        .map((p: any) => p.text)
+        .join("") ?? msg.content ?? "";
+      return { role: msg.role ?? "user", content: text };
+    });
 
     if (!apiKey) {
       return new Response(JSON.stringify({ error: "API Key diperlukan" }), {
@@ -45,19 +40,19 @@ export async function POST(req: Request) {
       });
     }
 
-    const config = PROVIDER_CONFIG[provider] || { type: "openai" as const };
+    const config = getProviderConfig(provider as any);
     const effectiveBaseURL = baseURL || config.baseURL || undefined;
-    const modelName = model || "gpt-4o";
+    const modelName = model || config.defaultModel;
     const lastUserMsg = coreMessages.filter((m: { role: string }) => m.role === "user").pop()?.content ?? "";
     const isMagicMode = lastUserMsg.startsWith("[MODE MAGIC]");
     const systemPrompt = getPipelineSystemPrompt(stage ?? 0, isMagicMode);
 
     let llmModel;
 
-    if (config.type === "anthropic") {
+    if (config.sdkType === "anthropic") {
       const client = createAnthropic({ apiKey, baseURL: effectiveBaseURL });
       llmModel = client(modelName);
-    } else if (config.type === "gemini") {
+    } else if (config.sdkType === "gemini") {
       const client = createGoogleGenerativeAI({ apiKey, baseURL: effectiveBaseURL });
       llmModel = client(modelName);
     } else {

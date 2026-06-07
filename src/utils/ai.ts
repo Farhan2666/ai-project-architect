@@ -1,6 +1,6 @@
 "use client";
 
-export type AIProvider = "openai" | "anthropic" | "gemini" | "openrouter" | "deepseek" | "groq" | "custom";
+import { getProviderConfig, type AIProvider } from "@/lib/provider-registry";
 
 interface ProviderEndpoint {
   url: string;
@@ -60,7 +60,7 @@ const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
   },
 };
 
-export function getProviderConfig(provider: AIProvider, baseURL?: string) {
+export function getProviderConfigOld(provider: AIProvider, baseURL?: string) {
   const cfg = PROVIDER_ENDPOINTS[provider] || PROVIDER_ENDPOINTS.openai;
   return {
     ...cfg,
@@ -74,13 +74,16 @@ export function buildFetchPayload(
   model: string,
   baseURL?: string,
 ) {
-  const cfg = getProviderConfig(provider, baseURL);
+  const info = getProviderConfig(provider);
+  const cfg = PROVIDER_ENDPOINTS[provider] || PROVIDER_ENDPOINTS.openai;
+  const url = baseURL || info.baseURL || cfg.url;
+
   return {
-    url: cfg.url.endsWith("/chat/completions")
-      ? cfg.url
+    url: url.endsWith("/chat/completions")
+      ? url
       : provider === "gemini"
-        ? `${cfg.url}/${model}:streamGenerateContent?alt=sse`
-        : `${cfg.url}/chat/completions`,
+        ? `${url}/${model}:streamGenerateContent?alt=sse`
+        : `${url}/chat/completions`,
     headers: cfg.headers,
     body: cfg.transformBody(messages, model) as Record<string, unknown>,
     extract: cfg.extractContent,

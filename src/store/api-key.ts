@@ -1,72 +1,6 @@
 import { create } from "zustand";
 import { encryptApiKey, decryptApiKey } from "@/lib/crypto";
-
-export type AIProvider = "openai" | "anthropic" | "gemini" | "openrouter" | "deepseek" | "groq" | "custom";
-
-export interface ProviderInfo {
-  id: AIProvider;
-  label: string;
-  format: string;
-  pattern: RegExp;
-  baseURL: string;
-  defaultModel: string;
-  models: string[];
-  docsURL: string;
-}
-
-export const PROVIDER_LIST: ProviderInfo[] = [
-  {
-    id: "openai", label: "OpenAI", format: "sk-...", pattern: /^sk-/,
-    baseURL: "", defaultModel: "gpt-4o",
-    models: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-nano", "o3", "o4-mini"],
-    docsURL: "https://platform.openai.com/api-keys",
-  },
-  {
-    id: "anthropic", label: "Anthropic", format: "sk-ant-...", pattern: /^sk-ant-/,
-    baseURL: "", defaultModel: "claude-sonnet-4-20250514",
-    models: ["claude-sonnet-4-20250514", "claude-3-5-haiku-latest", "claude-3-opus-latest"],
-    docsURL: "https://console.anthropic.com/keys",
-  },
-  {
-    id: "gemini", label: "Gemini", format: "AIza...", pattern: /^AIza/,
-    baseURL: "", defaultModel: "gemini-2.5-flash",
-    models: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],
-    docsURL: "https://aistudio.google.com/app/apikey",
-  },
-  {
-    id: "openrouter", label: "OpenRouter", format: "sk-or-...", pattern: /^sk-or-/,
-    baseURL: "https://openrouter.ai/api/v1", defaultModel: "google/gemini-2.5-flash",
-    models: [
-      "google/gemini-2.5-flash",
-      "google/gemini-2.0-flash",
-      "meta-llama/llama-4-scout",
-      "mistralai/mistral-7b-instruct",
-      "deepseek/deepseek-chat",
-      "qwen/qwen-2.5-72b-instruct",
-      "cohere/command-r7b-12-2024",
-      "nousresearch/hermes-3-llama-3.1-405b",
-    ],
-    docsURL: "https://openrouter.ai/keys",
-  },
-  {
-    id: "deepseek", label: "DeepSeek", format: "sk-...", pattern: /^sk-/,
-    baseURL: "https://api.deepseek.com/v1", defaultModel: "deepseek-chat",
-    models: ["deepseek-chat", "deepseek-reasoner"],
-    docsURL: "https://platform.deepseek.com/api_keys",
-  },
-  {
-    id: "groq", label: "Groq", format: "gsk_...", pattern: /^gsk_/,
-    baseURL: "https://api.groq.com/openai/v1", defaultModel: "llama-3.3-70b-versatile",
-    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"],
-    docsURL: "https://console.groq.com/keys",
-  },
-  {
-    id: "custom", label: "Custom", format: "API Key", pattern: /^.+$/,
-    baseURL: "https://", defaultModel: "",
-    models: [],
-    docsURL: "",
-  },
-];
+import { PROVIDER_REGISTRY, type AIProvider } from "@/lib/provider-registry";
 
 interface ApiKeyState {
   provider: AIProvider;
@@ -92,10 +26,6 @@ const STORAGE_PROVIDER_KEY = "ai-project-architect-provider";
 const STORAGE_BASEURL_KEY = "ai-project-architect-baseurl";
 const STORAGE_MODEL_KEY = "ai-project-architect-model";
 
-function getProviderInfo(prov: AIProvider): ProviderInfo {
-  return PROVIDER_LIST.find((p) => p.id === prov) || PROVIDER_LIST[0];
-}
-
 export const useApiKeyStore = create<ApiKeyState>((set, get) => ({
   provider: "openai",
   apiKey: "",
@@ -105,7 +35,7 @@ export const useApiKeyStore = create<ApiKeyState>((set, get) => ({
   pinSet: false,
 
   setProvider: (provider) => set((state) => {
-    const info = getProviderInfo(provider);
+    const info = PROVIDER_REGISTRY[provider];
     return {
       provider,
       baseURL: info.baseURL,
@@ -118,7 +48,7 @@ export const useApiKeyStore = create<ApiKeyState>((set, get) => ({
   setModel: (model) => set({ model }),
 
   saveKey: async (pin, provider, key, baseURL, model) => {
-    const info = getProviderInfo(provider);
+    const info = PROVIDER_REGISTRY[provider];
     const url = baseURL ?? info.baseURL;
     const mdl = model ?? info.defaultModel;
 
@@ -139,7 +69,7 @@ export const useApiKeyStore = create<ApiKeyState>((set, get) => ({
     if (encrypted && provider) {
       try {
         const decrypted = await decryptApiKey(pin, encrypted);
-        const info = getProviderInfo(provider);
+        const info = PROVIDER_REGISTRY[provider];
         set({
           apiKey: decrypted, provider, baseURL,
           model: model || info.defaultModel,

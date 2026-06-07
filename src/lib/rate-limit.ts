@@ -3,8 +3,54 @@ import { Redis } from "@upstash/redis";
 
 const RATE_LIMIT_WINDOW = 60_000;
 const RATE_LIMIT_MAX = 30;
+const CLEANUP_INTERVAL = 30_000;
 
-const memoryMap = new Map<string, { count: number; resetAt: number }>();
+interface CacheEntry {
+  count: number;
+  resetAt: number;
+}
+
+class AutoCleanupCache {
+  private cache = new Map<string, CacheEntry>();
+  private timer: ReturnType<typeof setInterval> | null = null;
+
+  constructor() {
+    this.timer = setInterval(() => this.evict(), CLEANUP_INTERVAL);
+    if (this.timer && typeof this.timer === "object") {
+      this.timer.unref();
+    }
+  }
+
+  get(key: string): CacheEntry | undefined {
+    const entry = this.cache.get(key);
+    if (!entry) return undefined;
+    if (Date.now() > entry.resetAt) {
+      this.cache.delete(key);
+      return undefined;
+    }
+    return entry;
+  }
+
+  set(key: string, entry: CacheEntry): void {
+    this.cache.set(key, entry);
+  }
+
+  private evict(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache) {
+      if (now > entry.resetAt) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  destroy(): void {
+    if (this.timer) clearInterval(this.timer);
+    this.cache.clear();
+  }
+}
+
+const memoryCache = new AutoCleanupCache();
 
 let upstashRatelimit: Ratelimit | null = null;
 
@@ -33,14 +79,14 @@ export async function rateLimit(
       const result = await upstashRatelimit.limit(key);
       return { allowed: result.success, remaining: result.remaining };
     } catch {
-      // fallback
+      // fallback to in-memory
     }
   }
 
   const now = Date.now();
-  const entry = memoryMap.get(key);
-  if (!entry || now > entry.resetAt) {
-    memoryMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+  const entry = memoryCache.get(key);
+  if (!entry) {
+    memoryCache.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
     return { allowed: true, remaining: RATE_LIMIT_MAX - 1 };
   }
   entry.count++;
