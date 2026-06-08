@@ -103,6 +103,26 @@ export default function ChatPanel() {
           "x-model": s.model,
         };
       },
+      // FIX #1: Kirim stage ke body API supaya server pakai system prompt yang benar
+      body: () => {
+        const currentStage = stageRef.current;
+        const body: Record<string, unknown> = { stage: currentStage };
+        // FIX: Kirim ringkasan stage sebelumnya ke API saat di stage 5 (Task Breakdown)
+        // supaya AI punya full context dari Brand, PRD, SRS, SDD, UX
+        if (currentStage === 5) {
+          const { stages } = useProjectStore.getState();
+          const summaries: Record<string, string> = {};
+          const stageKeys = ["brand", "prd", "srs", "sdd", "ux"] as const;
+          for (const key of stageKeys) {
+            const summary = stages[key]?.summary;
+            if (summary) summaries[key] = summary;
+          }
+          if (Object.keys(summaries).length > 0) {
+            body.previousStageSummaries = summaries;
+          }
+        }
+        return body;
+      },
     }),
     onFinish: (result: any) => {
       const s = stageRef.current;
@@ -134,6 +154,8 @@ export default function ChatPanel() {
         }
         updateStageData(stageKey as "brand" | "prd" | "srs" | "sdd" | "ux" | "tasks", "summary", text);
         markStageComplete(s);
+        // FIX #2: Reset flag setelah doc selesai di-generate
+        isGeneratingDocRef.current = false;
       } else {
         updateStageData(stageKey as "brand" | "prd" | "srs" | "sdd" | "ux" | "tasks", "summary", text);
       }
@@ -332,6 +354,7 @@ export default function ChatPanel() {
               >
                 Finalisasi & Buat Dokumen
               </button>
+              {/* FIX #3: Tampilkan Next Stage hanya sampai stage 4 (index 4 → 5 adalah stage terakhir) */}
               {isStageComplete(activeStage) && activeStage < 5 && (
                 <button
                   onClick={() => nextStage()}
