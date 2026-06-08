@@ -259,8 +259,6 @@ export default function ChatPanel() {
     setInput("");
   };
 
-  // ⚡ FITUR BARU: Auto Generate All 6 Stages
-  // Ketik 1 kalimat ide app → sistem otomatis generate semua 6 bagian dokumen
   const handleAutoGenerateAll = useCallback(async () => {
     const ideaText = input.trim();
     if (!ideaText || !apiKey || isAutoRunning) return;
@@ -269,16 +267,64 @@ export default function ChatPanel() {
     setInput("");
 
     const stageKeys = ["brand", "prd", "srs", "sdd", "ux", "tasks"] as const;
-    const stagePrompts = [
-      `Kamu adalah Brand Strategist ahli. Berdasarkan ide aplikasi: "${ideaText}"\n\nLangsung buat dokumen Brand & Identity final dalam format Markdown yang lengkap dan terstruktur. Sertakan: Nama Aplikasi, Konsep Inti, Warna Brand (primary & secondary dengan hex), Vibe UI, dan Konsep Logo. Jangan basa-basi, langsung dokumen.`,
-      `Kamu adalah Product Manager ahli. Berdasarkan ide aplikasi: "${ideaText}"\n\nLangsung buat dokumen PRD (Product Requirements Document) final dalam format Markdown yang lengkap. Sertakan: Core Problem, Target Audience, MVP Features (min 5 fitur), User Journey step-by-step. Jangan basa-basi, langsung dokumen.`,
-      `Kamu adalah Systems Analyst ahli. Berdasarkan ide aplikasi: "${ideaText}"\n\nLangsung buat dokumen SRS (Software Requirements Specification) final dalam format Markdown yang lengkap. Sertakan: Business Logic, Edge Cases, Form Validations, User Roles & Permissions, Error Handling. Jangan basa-basi, langsung dokumen.`,
-      `Kamu adalah Software Architect ahli. Berdasarkan ide aplikasi: "${ideaText}"\n\nLangsung buat dokumen SDD (System Design Document) final dalam format Markdown yang lengkap. Sertakan: Tech Stack (frontend, backend, database), Database Schema (tabel & relasi), API Architecture (endpoint utama), Third-party Integrations. Jangan basa-basi, langsung dokumen.`,
-      `Kamu adalah UX Designer ahli. Berdasarkan ide aplikasi: "${ideaText}"\n\nLangsung buat dokumen UI/UX Flow final dalam format Markdown yang lengkap. Sertakan: Screen-by-screen breakdown, Modals & Overlays, Navigation Flow, Key Interactions per screen. Jangan basa-basi, langsung dokumen.`,
-      `Kamu adalah Agile Project Manager ahli. Berdasarkan ide aplikasi: "${ideaText}"\n\nLangsung buat dokumen Task Breakdown (Sprint Plan) final dalam format Markdown yang lengkap. Pecah menjadi: Phase 1 (Setup & Foundation), Phase 2 (Core Features), Phase 3 (UI Polish & Integration), Phase 4 (Testing & Launch), Future Phases. Tiap task sertakan estimasi complexity. Jangan basa-basi, langsung dokumen.`,
-    ];
-
     const { apiKey: key, provider: prov, baseURL: burl, model: mdl } = useApiKeyStore.getState();
+
+    // ─── PHASE 0: Competitive Analysis ───────────────────────────────────────
+    setAutoProgress({ current: 0, label: "🔍 Riset Kompetitor & Pasar" });
+
+    let competitiveContext = "";
+    try {
+      const compRes = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": key,
+          "x-provider": prov,
+          "x-base-url": burl || "",
+          "x-model": mdl,
+        },
+        body: JSON.stringify({
+          stage: 0,
+          messages: [{
+            role: "user",
+            content: `Kamu adalah Market Research Analyst ahli. Lakukan riset mendalam untuk ide aplikasi berikut: "${ideaText}"
+
+Tugasmu (langsung, tanpa basa-basi):
+1. **Identifikasi 3 kompetitor nyata** yang sudah ada di pasar (sebutkan nama aslinya, bukan contoh fiktif)
+2. Untuk tiap kompetitor analisis:
+   - ✅ Kelebihan utama mereka
+   - ❌ Kelemahan / celah yang belum mereka isi dengan baik
+3. **Unique Selling Proposition (USP)** yang bisa membuat aplikasi ini jauh lebih unggul
+4. **Target market underserved** yang paling potensial
+
+Format output dalam Markdown yang rapi dengan heading jelas. Jadilah spesifik dan faktual berdasarkan pengetahuanmu tentang aplikasi-aplikasi yang benar-benar ada.`,
+          }],
+        }),
+      });
+
+      if (compRes.ok) {
+        competitiveContext = await readStreamText(compRes);
+        if (competitiveContext.trim()) {
+          appendDocument(`\n\n## 🔍 Competitive Analysis\n\n${competitiveContext.trim()}`);
+        }
+      }
+    } catch {
+      // Lanjut meskipun competitive analysis gagal
+    }
+
+    // ─── PHASE 1–6: Generate 6 Stage Documents ───────────────────────────────
+    const competitiveCtxBlock = competitiveContext.trim()
+      ? `\n\n---\n## KONTEKS RISET KOMPETITOR (gunakan sebagai landasan):\n${competitiveContext.trim()}\n---\n\nBerdasarkan riset di atas, pastikan solusi yang kamu buat secara spesifik mengatasi kelemahan kompetitor dan menonjolkan USP yang sudah diidentifikasi.`
+      : "";
+
+    const stagePrompts = [
+      `Kamu adalah Brand Strategist ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}\n\nLangsung buat dokumen **Brand & Identity** final dalam format Markdown. Sertakan: Nama Aplikasi yang unik & memorable (berbeda dari kompetitor), Tagline, Konsep Inti, Positioning statement vs kompetitor, Warna Brand (primary & secondary dengan hex code), Vibe UI, Konsep Logo. Jangan basa-basi.`,
+      `Kamu adalah Product Manager ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}\n\nLangsung buat dokumen **PRD** final dalam format Markdown. Sertakan: Core Problem (yang belum diselesaikan kompetitor), Target Audience spesifik, MVP Features (min 5 fitur, prioritaskan fitur diferensiasi dari kompetitor), User Journey step-by-step. Jangan basa-basi.`,
+      `Kamu adalah Systems Analyst ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}\n\nLangsung buat dokumen **SRS** final dalam format Markdown. Sertakan: Business Logic (termasuk aturan yang jadi keunggulan vs kompetitor), Edge Cases, Form Validations, User Roles & Permissions, Error Handling. Jangan basa-basi.`,
+      `Kamu adalah Software Architect ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}\n\nLangsung buat dokumen **SDD** final dalam format Markdown. Sertakan: Tech Stack modern (frontend, backend, database), Database Schema (tabel & relasi utama), API Architecture (endpoint utama), Third-party Integrations yang mendukung USP. Jangan basa-basi.`,
+      `Kamu adalah UX Designer ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}\n\nLangsung buat dokumen **UI/UX Flow** final dalam format Markdown. Sertakan: Screen-by-screen breakdown (fokus pada pain point yang kompetitor gagal address), Modals & Overlays, Navigation Flow, Key Interactions per screen. Jangan basa-basi.`,
+      `Kamu adalah Agile Project Manager ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}\n\nLangsung buat dokumen **Task Breakdown (Sprint Plan)** final dalam format Markdown. Pecah menjadi: Phase 1 (Setup & Foundation), Phase 2 (Core Features & Differentiators vs kompetitor), Phase 3 (UI Polish & Integration), Phase 4 (Testing & Launch), Future Phases. Tiap task sertakan estimasi complexity (S/M/L). Jangan basa-basi.`,
+    ];
 
     for (let i = 0; i < stageKeys.length; i++) {
       const stageKey = stageKeys[i];
@@ -315,13 +361,12 @@ export default function ChatPanel() {
           markStageComplete(i as StageId);
           appendDocument(`\n\n## ${stageLabel}\n\n${fullText.trim()}`);
 
-          // Extract app name dari hasil stage 0 (Brand & Identity)
           if (i === 0) {
             const nameMatch = fullText.match(/(?:nama app(?:likasi)?|app name|project name|nama proyek)[:\s*#*]+([^\n*#]+)/i);
             if (nameMatch) setAppName(nameMatch[1].trim().replace(/[*_`#]/g, "").trim());
           }
         }
-      } catch (err) {
+      } catch {
         show(`❌ Error saat generate ${stageLabel}`, "error");
         break;
       }
@@ -363,13 +408,23 @@ export default function ChatPanel() {
         <div className="px-4 py-2 border-b border-white/5 bg-yellow-500/5">
           <div className="flex items-center gap-2 mb-1">
             <Zap className="w-3 h-3 text-yellow-400 animate-pulse" />
-            <span className="text-xs text-yellow-300 font-medium">Auto Generate: {autoProgress.label}</span>
-            <span className="text-xs text-white/40 ml-auto">{autoProgress.current}/6</span>
+            <span className="text-xs text-yellow-300 font-medium">
+              {autoProgress.current === 0
+                ? `⟳ ${autoProgress.label}`
+                : `Auto Generate ${autoProgress.current}/6: ${autoProgress.label}`}
+            </span>
+            <span className="text-xs text-white/40 ml-auto">
+              {autoProgress.current === 0 ? "Riset dulu..." : `${autoProgress.current}/6`}
+            </span>
           </div>
           <div className="h-1 bg-white/10 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-yellow-500 to-purple-500 rounded-full transition-all duration-500"
-              style={{ width: `${(autoProgress.current / 6) * 100}%` }}
+              className={`h-full rounded-full transition-all duration-500 ${
+                autoProgress.current === 0
+                  ? "bg-gradient-to-r from-blue-500 to-cyan-400 animate-pulse w-1/4"
+                  : "bg-gradient-to-r from-yellow-500 to-purple-500"
+              }`}
+              style={autoProgress.current > 0 ? { width: `${(autoProgress.current / 6) * 100}%` } : {}}
             />
           </div>
         </div>
