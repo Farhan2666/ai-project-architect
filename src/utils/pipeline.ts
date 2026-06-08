@@ -1,4 +1,4 @@
-﻿export interface PipelineContext {
+export interface PipelineContext {
   masterStructure: string;
   expandedSections: string[];
   compressedSummary: string;
@@ -84,6 +84,7 @@ export function getPipelineSystemPrompt(stage: number, isMagicMode: boolean = fa
       "5. Menyajikan seluruh hasil analisis secara mandiri, lengkap, terstruktur dalam format Markdown yang sangat rapi (menggunakan heading, list, dan tabel perbandingan jika perlu), tanpa meminta input balik atau bertanya kembali kepada pengguna.";
 
     const basePrompts: Record<number, string> = {
+      [-1]: "Kamu adalah Market Research Analyst yang ahli. Tugasmu adalah langsung meriset pasar dan merumuskan analisis kompetitor secara mendalam, faktual, dan lengkap (Identifikasi 3 kompetitor nyata, analisis kelebihan/kekurangan, USP, target market underserved). Hasilkan dokumen Markdown yang rapi tanpa basa-basi.",
       0: "Kamu adalah Brand Strategist yang ahli. Tugasmu adalah langsung meriset dan merumuskan identitas brand lengkap untuk konsep aplikasi pengguna (Nama Aplikasi, Konsep Inti, Warna, Vibe UI, dan Konsep Logo)." + magicInstruction,
       1: "Kamu adalah Product Manager yang ahli. Tugasmu adalah langsung merumuskan PRD lengkap untuk konsep aplikasi pengguna (Core Problem, Target Audience, MVP Features, User Journey)." + magicInstruction,
       2: "Kamu adalah Systems Analyst yang ahli. Tugasmu adalah langsung merumuskan SRS lengkap untuk konsep aplikasi pengguna (Business Logic, Edge Cases, Form Validations, User Roles, Error Handling)." + magicInstruction,
@@ -95,8 +96,9 @@ export function getPipelineSystemPrompt(stage: number, isMagicMode: boolean = fa
   }
 
   const basePrompts: Record<number, string> = {
+    [-1]: "Kamu adalah Market Research Analyst yang ahli. Tugasmu adalah mewawancarai pengguna dan membantu melakukan riset pasar serta analisis kompetitor." + commonInstruction,
     0: "Kamu adalah Brand Strategist yang ahli. Tugasmu adalah mewawancarai pengguna dan menggali identitas brand mereka (Nama Aplikasi, Konsep Inti, Warna, Vibe UI, dan Konsep Logo)." + commonInstruction,
-    1: "Kamu adalah Product Manager yang ahli. Tugasmu adalah mewawancarai pengguna dan mendefinisikan PRD (Core Problem, Target Audience, MVP Features, User Journey)." + commonInstruction,
+    1: "Kamu adalah Product Manager yang ahli. Tugasmu adalah mewawancarai pengguna and mendefinisikan PRD (Core Problem, Target Audience, MVP Features, User Journey)." + commonInstruction,
     2: "Kamu adalah Systems Analyst yang ahli. Tugasmu adalah mewawancarai pengguna dan mendefinisikan SRS (Business Logic, Edge Cases, Form Validations, User Roles, Error Handling)." + commonInstruction,
     3: "Kamu adalah Software Architect yang ahli. Tugasmu adalah mewawancarai pengguna dan mendefinisikan SDD (Tech Stack, Database Schema, API Architecture, Integrations)." + commonInstruction,
     4: "Kamu adalah UX Designer yang ahli. Tugasmu adalah mewawancarai pengguna dan memetakan alur UI/UX (Screen breakdown, Modals, Navigation, Key Interactions)." + commonInstruction,

@@ -71,8 +71,9 @@ interface SpeechRecognitionAlternative {
   confidence: number;
 }
 
-// Helper: baca streaming response dari Vercel AI SDK dan kembalikan full text
-async function readStreamText(res: Response): Promise<string> {
+// Helper: baca plain text stream dari /api/generate
+// /api/generate menggunakan toTextStreamResponse() sehingga response adalah plain text
+async function readPlainStream(res: Response): Promise<string> {
   const reader = res.body?.getReader();
   if (!reader) return "";
   const decoder = new TextDecoder();
@@ -81,19 +82,11 @@ async function readStreamText(res: Response): Promise<string> {
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    const chunk = decoder.decode(value, { stream: true });
-    // Vercel AI SDK stream format: '0:"text chunk"\n'
-    for (const line of chunk.split("\n")) {
-      // text delta
-      const textMatch = line.match(/^0:"((?:[^"\\]|\\.)*)"/);
-      if (textMatch) {
-        try { fullText += JSON.parse(`"${textMatch[1]}"`); } catch { /* skip */ }
-        continue;
-      }
-      // finish_message delta (type 'd')
-    }
+    fullText += decoder.decode(value, { stream: true });
   }
-  return fullText;
+  // Flush decoder
+  fullText += decoder.decode();
+  return fullText.trim();
 }
 
 export default function ChatPanel() {
@@ -270,11 +263,12 @@ export default function ChatPanel() {
     const { apiKey: key, provider: prov, baseURL: burl, model: mdl } = useApiKeyStore.getState();
 
     // ─── PHASE 0: Competitive Analysis ───────────────────────────────────────
+    // AI riset kompetitor & pasar dulu sebelum mulai bikin rencana
     setAutoProgress({ current: 0, label: "🔍 Riset Kompetitor & Pasar" });
 
     let competitiveContext = "";
     try {
-      const compRes = await fetch("/api/chat", {
+      const compRes = await fetch("/api/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -284,47 +278,43 @@ export default function ChatPanel() {
           "x-model": mdl,
         },
         body: JSON.stringify({
-          stage: 0,
-          messages: [{
-            role: "user",
-            content: `Kamu adalah Market Research Analyst ahli. Lakukan riset mendalam untuk ide aplikasi berikut: "${ideaText}"
+          stage: -1,
+          prompt: `Kamu adalah Market Research Analyst ahli. Lakukan riset mendalam untuk ide aplikasi berikut: "${ideaText}"
 
 Tugasmu (langsung, tanpa basa-basi):
 1. **Identifikasi 3 kompetitor nyata** yang sudah ada di pasar (sebutkan nama aslinya, bukan contoh fiktif)
 2. Untuk tiap kompetitor analisis:
-   - ✅ Kelebihan utama mereka
-   - ❌ Kelemahan / celah yang belum mereka isi dengan baik
+   - Kelebihan utama mereka
+   - Celah yang belum mereka isi dengan baik
 3. **Unique Selling Proposition (USP)** yang bisa membuat aplikasi ini jauh lebih unggul
 4. **Target market underserved** yang paling potensial
 
 Format output dalam Markdown yang rapi dengan heading jelas. Jadilah spesifik dan faktual berdasarkan pengetahuanmu tentang aplikasi-aplikasi yang benar-benar ada.`,
-          }],
         }),
       });
 
       if (compRes.ok) {
-        competitiveContext = await readStreamText(compRes);
-        if (competitiveContext.trim()) {
-          appendDocument(`\n\n## 🔍 Competitive Analysis\n\n${competitiveContext.trim()}`);
+        competitiveContext = await readPlainStream(compRes);
+        if (competitiveContext) {
+          appendDocument(`\n\n## 🔍 Competitive Analysis\n\n${competitiveContext}`);
+          show("✅ Riset kompetitor selesai, mulai generate dokumen...");
+        } else {
+          show("⚠️ Riset kompetitor kosong, lanjut generate dokumen.", "error");
         }
+      } else {
+        const errBody = await compRes.json().catch(() => ({}));
+        show(`⚠️ Riset kompetitor gagal (${errBody.error || compRes.status}), lanjut tanpa konteks kompetitor.`, "error");
       }
-    } catch {
-      // Lanjut meskipun competitive analysis gagal
+    } catch (e) {
+      show(`⚠️ Network error saat riset kompetitor: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
 
     // ─── PHASE 1–6: Generate 6 Stage Documents ───────────────────────────────
-    const competitiveCtxBlock = competitiveContext.trim()
-      ? `\n\n---\n## KONTEKS RISET KOMPETITOR (gunakan sebagai landasan):\n${competitiveContext.trim()}\n---\n\nBerdasarkan riset di atas, pastikan solusi yang kamu buat secara spesifik mengatasi kelemahan kompetitor dan menonjolkan USP yang sudah diidentifikasi.`
+    const competitiveCtxBlock = competitiveContext
+      ? `\n\n---\n## KONTEKS RISET KOMPETITOR (gunakan sebagai landasan):\n${competitiveContext}\n---\n\nBerdasarkan riset di atas, pastikan solusi yang kamu buat secara spesifik mengatasi kelemahan kompetitor dan menonjolkan USP yang sudah diidentifikasi.`
       : "";
 
-    const stagePrompts = [
-      `Kamu adalah Brand Strategist ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}\n\nLangsung buat dokumen **Brand & Identity** final dalam format Markdown. Sertakan: Nama Aplikasi yang unik & memorable (berbeda dari kompetitor), Tagline, Konsep Inti, Positioning statement vs kompetitor, Warna Brand (primary & secondary dengan hex code), Vibe UI, Konsep Logo. Jangan basa-basi.`,
-      `Kamu adalah Product Manager ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}\n\nLangsung buat dokumen **PRD** final dalam format Markdown. Sertakan: Core Problem (yang belum diselesaikan kompetitor), Target Audience spesifik, MVP Features (min 5 fitur, prioritaskan fitur diferensiasi dari kompetitor), User Journey step-by-step. Jangan basa-basi.`,
-      `Kamu adalah Systems Analyst ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}\n\nLangsung buat dokumen **SRS** final dalam format Markdown. Sertakan: Business Logic (termasuk aturan yang jadi keunggulan vs kompetitor), Edge Cases, Form Validations, User Roles & Permissions, Error Handling. Jangan basa-basi.`,
-      `Kamu adalah Software Architect ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}\n\nLangsung buat dokumen **SDD** final dalam format Markdown. Sertakan: Tech Stack modern (frontend, backend, database), Database Schema (tabel & relasi utama), API Architecture (endpoint utama), Third-party Integrations yang mendukung USP. Jangan basa-basi.`,
-      `Kamu adalah UX Designer ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}\n\nLangsung buat dokumen **UI/UX Flow** final dalam format Markdown. Sertakan: Screen-by-screen breakdown (fokus pada pain point yang kompetitor gagal address), Modals & Overlays, Navigation Flow, Key Interactions per screen. Jangan basa-basi.`,
-      `Kamu adalah Agile Project Manager ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}\n\nLangsung buat dokumen **Task Breakdown (Sprint Plan)** final dalam format Markdown. Pecah menjadi: Phase 1 (Setup & Foundation), Phase 2 (Core Features & Differentiators vs kompetitor), Phase 3 (UI Polish & Integration), Phase 4 (Testing & Launch), Future Phases. Tiap task sertakan estimasi complexity (S/M/L). Jangan basa-basi.`,
-    ];
+    const generatedSummaries: Record<string, string> = {};
 
     for (let i = 0; i < stageKeys.length; i++) {
       const stageKey = stageKeys[i];
@@ -332,8 +322,42 @@ Format output dalam Markdown yang rapi dengan heading jelas. Jadilah spesifik da
       setAutoProgress({ current: i + 1, label: stageLabel });
       setActiveStage(i as StageId);
 
+      // Build context dari stage sebelumnya secara dinamis agar sistem saling berkesinambungan
+      let contextBlock = "";
+      const stageNames: Record<string, string> = {
+        brand: "Brand & Identity",
+        prd: "Product Requirements Document (PRD)",
+        srs: "System Requirements Specification (SRS)",
+        sdd: "System Design Document (SDD)",
+        ux: "UI/UX Flow Blueprint",
+      };
+      
+      const previousContexts = Object.entries(generatedSummaries)
+        .filter(([, text]) => text && text.trim())
+        .map(([key, text]) => `### ${stageNames[key] || key}\n${text}`)
+        .join("\n\n");
+        
+      if (previousContexts) {
+        contextBlock = `\n\n---\n## REFERENSI DOKUMEN TAHAP SEBELUMNYA (Harus diikuti agar konsisten & berkesinambungan):\n${previousContexts}\n---\n`;
+      }
+
+      let stagePrompt = "";
+      if (i === 0) {
+        stagePrompt = `Kamu adalah Brand Strategist ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}\n\nLangsung buat dokumen **Brand & Identity** final dalam format Markdown. Sertakan: Nama Aplikasi yang unik & memorable (berbeda dari kompetitor), Tagline, Konsep Inti, Positioning statement vs kompetitor, Warna Brand (primary & secondary dengan hex code), Vibe UI, Konsep Logo. Jangan basa-basi.`;
+      } else if (i === 1) {
+        stagePrompt = `Kamu adalah Product Manager ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}${contextBlock}\n\nLangsung buat dokumen **PRD** final dalam format Markdown. Sertakan: Core Problem (yang belum diselesaikan kompetitor), Target Audience spesifik, MVP Features (min 5 fitur, prioritaskan fitur diferensiasi dari kompetitor), User Journey step-by-step. Jangan basa-basi.`;
+      } else if (i === 2) {
+        stagePrompt = `Kamu adalah Systems Analyst ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}${contextBlock}\n\nLangsung buat dokumen **SRS** final dalam format Markdown. Sertakan: Business Logic (termasuk aturan yang jadi keunggulan vs kompetitor), Edge Cases, Form Validations, User Roles & Permissions, Error Handling. Jangan basa-basi.`;
+      } else if (i === 3) {
+        stagePrompt = `Kamu adalah Software Architect ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}${contextBlock}\n\nLangsung buat dokumen **SDD** final dalam format Markdown. Sertakan: Tech Stack modern (frontend, backend, database), Database Schema (tabel & relasi utama), API Architecture (endpoint utama), Third-party Integrations yang mendukung USP. Jangan basa-basi.`;
+      } else if (i === 4) {
+        stagePrompt = `Kamu adalah UX Designer ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}${contextBlock}\n\nLangsung buat dokumen **UI/UX Flow** final dalam format Markdown. Sertakan: Screen-by-screen breakdown (fokus pada pain point yang kompetitor gagal address), Modals & Overlays, Navigation Flow, Key Interactions per screen. Jangan basa-basi.`;
+      } else {
+        stagePrompt = `Kamu adalah Agile Project Manager ahli. Berdasarkan ide aplikasi: "${ideaText}"${competitiveCtxBlock}${contextBlock}\n\nLangsung buat dokumen **Task Breakdown (Sprint Plan)** final dalam format Markdown. Pecah menjadi: Phase 1 (Setup & Foundation), Phase 2 (Core Features & Differentiators vs kompetitor), Phase 3 (UI Polish & Integration), Phase 4 (Testing & Launch), Future Phases. Tiap task sertakan estimasi complexity (S/M/L). Jangan basa-basi.`;
+      }
+
       try {
-        const res = await fetch("/api/chat", {
+        const res = await fetch("/api/generate", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -344,30 +368,34 @@ Format output dalam Markdown yang rapi dengan heading jelas. Jadilah spesifik da
           },
           body: JSON.stringify({
             stage: i,
-            messages: [{ role: "user", content: stagePrompts[i] }],
+            prompt: stagePrompt,
           }),
         });
 
         if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: "Unknown error" }));
-          show(`❌ Gagal generate ${stageLabel}: ${err.error || res.statusText}`, "error");
+          const errBody = await res.json().catch(() => ({ error: res.statusText }));
+          show(`❌ Gagal generate ${stageLabel}: ${errBody.error || res.status}`, "error");
           break;
         }
 
-        const fullText = await readStreamText(res);
+        const fullText = await readPlainStream(res);
 
-        if (fullText.trim()) {
-          updateStageData(stageKey, "summary", fullText.trim());
+        if (fullText) {
+          generatedSummaries[stageKey] = fullText;
+          updateStageData(stageKey, "summary", fullText);
           markStageComplete(i as StageId);
-          appendDocument(`\n\n## ${stageLabel}\n\n${fullText.trim()}`);
+          appendDocument(`\n\n## ${stageLabel}\n\n${fullText}`);
+          show(`✅ ${stageLabel} selesai (${i + 1}/6)`);
 
           if (i === 0) {
             const nameMatch = fullText.match(/(?:nama app(?:likasi)?|app name|project name|nama proyek)[:\s*#*]+([^\n*#]+)/i);
             if (nameMatch) setAppName(nameMatch[1].trim().replace(/[*_`#]/g, "").trim());
           }
+        } else {
+          show(`⚠️ ${stageLabel} menghasilkan teks kosong, skip.`, "error");
         }
-      } catch {
-        show(`❌ Error saat generate ${stageLabel}`, "error");
+      } catch (e) {
+        show(`❌ Error generate ${stageLabel}: ${e instanceof Error ? e.message : String(e)}`, "error");
         break;
       }
     }
