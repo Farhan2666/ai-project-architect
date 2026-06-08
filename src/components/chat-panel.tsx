@@ -8,7 +8,8 @@ import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { useApiKeyStore } from "@/store/api-key";
 import { useProjectStore, STAGES, type StageId } from "@/store/project";
-import { Send, Loader2, Key, ChevronRight, Mic, MicOff, Sparkles } from "lucide-react";
+import { Send, Loader2, Key, ChevronRight, Mic, MicOff, Sparkles, Zap } from "lucide-react";
+import { useToast } from "@/components/toast";
 
 function getMessageDisplayContent(m: any): string {
   const rawText = m.parts && m.parts.length > 0
@@ -70,10 +71,36 @@ interface SpeechRecognitionAlternative {
   confidence: number;
 }
 
+// Helper: baca streaming response dari Vercel AI SDK dan kembalikan full text
+async function readStreamText(res: Response): Promise<string> {
+  const reader = res.body?.getReader();
+  if (!reader) return "";
+  const decoder = new TextDecoder();
+  let fullText = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    // Vercel AI SDK stream format: '0:"text chunk"\n'
+    for (const line of chunk.split("\n")) {
+      // text delta
+      const textMatch = line.match(/^0:"((?:[^"\\]|\\.)*)"/);
+      if (textMatch) {
+        try { fullText += JSON.parse(`"${textMatch[1]}"`); } catch { /* skip */ }
+        continue;
+      }
+      // finish_message delta (type 'd')
+    }
+  }
+  return fullText;
+}
+
 export default function ChatPanel() {
   const { apiKey, provider, baseURL, model, openModal } = useApiKeyStore();
   const store = useProjectStore();
-  const { activeStage, markStageComplete, nextStage, appName, setAppName, updateStageData, appendDocument, isStageComplete } = store;
+  const { activeStage, markStageComplete, nextStage, appName, setAppName, updateStageData, appendDocument, isStageComplete, setActiveStage } = store;
+  const { show } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -81,6 +108,9 @@ export default function ChatPanel() {
   const [input, setInput] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [hasMicSupport, setHasMicSupport] = useState(true);
+  // State untuk fitur Auto Generate All
+  const [isAutoRunning, setIsAutoRunning] = useState(false);
+  const [autoProgress, setAutoProgress] = useState<{ current: number; label: string } | null>(null);
   const stageInfo = STAGES[activeStage];
   const suggestions = STAGE_SUGGESTIONS[activeStage];
 
@@ -90,6 +120,7 @@ export default function ChatPanel() {
   stageRef.current = activeStage;
   stageInfoRef.current = stageInfo;
 
+  // BUG FIX #1: kirim `stage` di body agar server pakai system prompt yang benar
   const { messages, sendMessage, regenerate, status, error } = useChat({
     id: `stage-${activeStage}`,
     transport: new DefaultChatTransport({
@@ -102,6 +133,21 @@ export default function ChatPanel() {
           "x-base-url": s.baseURL,
           "x-model": s.model,
         };
+      },
+      body: () => {
+        const currentStage = stageRef.current;
+        const body: Record<string, unknown> = { stage: currentStage };
+        // Kirim summary stage sebelumnya saat di stage 5 (Task Breakdown)
+        if (currentStage === 5) {
+          const { stages } = useProjectStore.getState();
+          const summaries: Record<string, string> = {};
+          for (const key of ["brand", "prd", "srs", "sdd", "ux"] as const) {
+            const s = stages[key]?.summary;
+            if (s) summaries[key] = s;
+          }
+          if (Object.keys(summaries).length > 0) body.previousStageSummaries = summaries;
+        }
+        return body;
       },
     }),
     onFinish: (result: any) => {
@@ -134,6 +180,8 @@ export default function ChatPanel() {
         }
         updateStageData(stageKey as "brand" | "prd" | "srs" | "sdd" | "ux" | "tasks", "summary", text);
         markStageComplete(s);
+        // BUG FIX #2: reset flag setelah doc selesai agar pesan berikutnya tidak auto-append
+        isGeneratingDocRef.current = false;
       } else {
         updateStageData(stageKey as "brand" | "prd" | "srs" | "sdd" | "ux" | "tasks", "summary", text);
       }
@@ -149,10 +197,7 @@ export default function ChatPanel() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!apiKey) {
-      openModal();
-      return;
-    }
+    if (!apiKey) { openModal(); return; }
     if (!input.trim() || isLoading) return;
     const msg = input.trim();
     setInput("");
@@ -161,10 +206,7 @@ export default function ChatPanel() {
 
   const handleChipClick = useCallback(
     (text: string) => {
-      if (!apiKey) {
-        openModal();
-        return;
-      }
+      if (!apiKey) { openModal(); return; }
       if (isLoadingRef.current) return;
       sendMessage({ text });
     },
@@ -177,31 +219,22 @@ export default function ChatPanel() {
       setIsListening(false);
       return;
     }
-
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognitionAPI) return;
-
     const recognition = new SpeechRecognitionAPI();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = typeof navigator !== "undefined" ? (navigator.language || "en-US") : "en-US";
-
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let finalTranscript = "";
       for (let i = event.results.length - 1; i >= 0; i--) {
         const result = event.results[i];
-        if (result.isFinal) {
-          finalTranscript = result[0].transcript + " " + finalTranscript;
-        }
+        if (result.isFinal) finalTranscript = result[0].transcript + " " + finalTranscript;
       }
-      if (finalTranscript) {
-        setInput((prev) => prev + finalTranscript);
-      }
+      if (finalTranscript) setInput((prev) => prev + finalTranscript);
     };
-
     recognition.onend = () => setIsListening(false);
     recognition.onerror = () => setIsListening(false);
-
     recognitionRef.current = recognition;
     recognition.start();
     setIsListening(true);
@@ -211,9 +244,7 @@ export default function ChatPanel() {
     if (typeof window !== "undefined") {
       setHasMicSupport(!!(window.SpeechRecognition || window.webkitSpeechRecognition));
     }
-    return () => {
-      recognitionRef.current?.stop();
-    };
+    return () => { recognitionRef.current?.stop(); };
   }, []);
 
   const handleGenerateDoc = () => {
@@ -228,6 +259,80 @@ export default function ChatPanel() {
     setInput("");
   };
 
+  // ⚡ FITUR BARU: Auto Generate All 6 Stages
+  // Ketik 1 kalimat ide app → sistem otomatis generate semua 6 bagian dokumen
+  const handleAutoGenerateAll = useCallback(async () => {
+    const ideaText = input.trim();
+    if (!ideaText || !apiKey || isAutoRunning) return;
+
+    setIsAutoRunning(true);
+    setInput("");
+
+    const stageKeys = ["brand", "prd", "srs", "sdd", "ux", "tasks"] as const;
+    const stagePrompts = [
+      `Kamu adalah Brand Strategist ahli. Berdasarkan ide aplikasi: "${ideaText}"\n\nLangsung buat dokumen Brand & Identity final dalam format Markdown yang lengkap dan terstruktur. Sertakan: Nama Aplikasi, Konsep Inti, Warna Brand (primary & secondary dengan hex), Vibe UI, dan Konsep Logo. Jangan basa-basi, langsung dokumen.`,
+      `Kamu adalah Product Manager ahli. Berdasarkan ide aplikasi: "${ideaText}"\n\nLangsung buat dokumen PRD (Product Requirements Document) final dalam format Markdown yang lengkap. Sertakan: Core Problem, Target Audience, MVP Features (min 5 fitur), User Journey step-by-step. Jangan basa-basi, langsung dokumen.`,
+      `Kamu adalah Systems Analyst ahli. Berdasarkan ide aplikasi: "${ideaText}"\n\nLangsung buat dokumen SRS (Software Requirements Specification) final dalam format Markdown yang lengkap. Sertakan: Business Logic, Edge Cases, Form Validations, User Roles & Permissions, Error Handling. Jangan basa-basi, langsung dokumen.`,
+      `Kamu adalah Software Architect ahli. Berdasarkan ide aplikasi: "${ideaText}"\n\nLangsung buat dokumen SDD (System Design Document) final dalam format Markdown yang lengkap. Sertakan: Tech Stack (frontend, backend, database), Database Schema (tabel & relasi), API Architecture (endpoint utama), Third-party Integrations. Jangan basa-basi, langsung dokumen.`,
+      `Kamu adalah UX Designer ahli. Berdasarkan ide aplikasi: "${ideaText}"\n\nLangsung buat dokumen UI/UX Flow final dalam format Markdown yang lengkap. Sertakan: Screen-by-screen breakdown, Modals & Overlays, Navigation Flow, Key Interactions per screen. Jangan basa-basi, langsung dokumen.`,
+      `Kamu adalah Agile Project Manager ahli. Berdasarkan ide aplikasi: "${ideaText}"\n\nLangsung buat dokumen Task Breakdown (Sprint Plan) final dalam format Markdown yang lengkap. Pecah menjadi: Phase 1 (Setup & Foundation), Phase 2 (Core Features), Phase 3 (UI Polish & Integration), Phase 4 (Testing & Launch), Future Phases. Tiap task sertakan estimasi complexity. Jangan basa-basi, langsung dokumen.`,
+    ];
+
+    const { apiKey: key, provider: prov, baseURL: burl, model: mdl } = useApiKeyStore.getState();
+
+    for (let i = 0; i < stageKeys.length; i++) {
+      const stageKey = stageKeys[i];
+      const stageLabel = STAGES[i].label;
+      setAutoProgress({ current: i + 1, label: stageLabel });
+      setActiveStage(i as StageId);
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": key,
+            "x-provider": prov,
+            "x-base-url": burl || "",
+            "x-model": mdl,
+          },
+          body: JSON.stringify({
+            stage: i,
+            messages: [{ role: "user", content: stagePrompts[i] }],
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: "Unknown error" }));
+          show(`❌ Gagal generate ${stageLabel}: ${err.error || res.statusText}`, "error");
+          break;
+        }
+
+        const fullText = await readStreamText(res);
+
+        if (fullText.trim()) {
+          updateStageData(stageKey, "summary", fullText.trim());
+          markStageComplete(i as StageId);
+          appendDocument(`\n\n## ${stageLabel}\n\n${fullText.trim()}`);
+
+          // Extract app name dari hasil stage 0 (Brand & Identity)
+          if (i === 0) {
+            const nameMatch = fullText.match(/(?:nama app(?:likasi)?|app name|project name|nama proyek)[:\s*#*]+([^\n*#]+)/i);
+            if (nameMatch) setAppName(nameMatch[1].trim().replace(/[*_`#]/g, "").trim());
+          }
+        }
+      } catch (err) {
+        show(`❌ Error saat generate ${stageLabel}`, "error");
+        break;
+      }
+    }
+
+    setIsAutoRunning(false);
+    setAutoProgress(null);
+    setActiveStage(0 as StageId);
+    show("✅ Semua 6 bagian berhasil di-generate! Lihat dokumen di panel kanan.");
+  }, [input, apiKey, isAutoRunning, updateStageData, markStageComplete, appendDocument, setAppName, setActiveStage, show]);
+
   const noKey = !apiKey;
 
   return (
@@ -238,7 +343,9 @@ export default function ChatPanel() {
             <h1 className="text-lg font-semibold text-white/90 truncate">AI Project Architect</h1>
             <p className="text-xs text-white/50 truncate">
               {appName ? `${appName} — ` : ""}
-              Stage {activeStage + 1}/6: {stageInfo.label}
+              {isAutoRunning && autoProgress
+                ? `⚡ Auto-generating ${autoProgress.current}/6: ${autoProgress.label}...`
+                : `Stage ${activeStage + 1}/6: ${stageInfo.label}`}
             </p>
           </div>
           <button
@@ -250,6 +357,23 @@ export default function ChatPanel() {
           </button>
         </div>
       </header>
+
+      {/* Progress bar saat Auto Generate berjalan */}
+      {isAutoRunning && autoProgress && (
+        <div className="px-4 py-2 border-b border-white/5 bg-yellow-500/5">
+          <div className="flex items-center gap-2 mb-1">
+            <Zap className="w-3 h-3 text-yellow-400 animate-pulse" />
+            <span className="text-xs text-yellow-300 font-medium">Auto Generate: {autoProgress.label}</span>
+            <span className="text-xs text-white/40 ml-auto">{autoProgress.current}/6</span>
+          </div>
+          <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-yellow-500 to-purple-500 rounded-full transition-all duration-500"
+              style={{ width: `${(autoProgress.current / 6) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {noKey ? (
         <div className="flex-1 flex items-center justify-center p-4">
@@ -264,7 +388,7 @@ export default function ChatPanel() {
       ) : (
         <>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.length === 0 && (
+            {messages.length === 0 && !isAutoRunning && (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center max-w-sm">
                   <p className="text-sm font-medium text-white/80 mb-1">{stageInfo.label}</p>
@@ -276,11 +400,26 @@ export default function ChatPanel() {
                     {activeStage === 4 && "Let's map out the user experience."}
                     {activeStage === 5 && "Let's break down tasks into sprints."}
                   </p>
+                  <p className="text-xs text-yellow-400/60 mt-3">
+                    💡 Ketik ide app kamu lalu klik ⚡ untuk auto-generate semua 6 bagian sekaligus
+                  </p>
                 </div>
               </div>
             )}
 
-            {messages
+            {isAutoRunning && (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <Zap className="w-8 h-8 text-yellow-400 animate-pulse mx-auto mb-3" />
+                  <p className="text-sm text-white/70 font-medium">Sedang generate semua bagian...</p>
+                  <p className="text-xs text-white/40 mt-1">
+                    {autoProgress ? `${autoProgress.current}/6 — ${autoProgress.label}` : "Memulai..."}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {!isAutoRunning && messages
               .filter((m) => m.role !== "system")
               .map((m) => (
                 <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -324,7 +463,7 @@ export default function ChatPanel() {
             </div>
           )}
 
-          {messages.filter((m) => m.role !== "system").length > 0 && !isLoading && (
+          {messages.filter((m) => m.role !== "system").length > 0 && !isLoading && !isAutoRunning && (
             <div className="flex justify-end px-4 pb-1 gap-2">
               <button
                 onClick={handleGenerateDoc}
@@ -332,6 +471,7 @@ export default function ChatPanel() {
               >
                 Finalisasi & Buat Dokumen
               </button>
+              {/* BUG FIX #3: Next Stage muncul sampai stage 4→5, bukan berhenti di stage 4 */}
               {isStageComplete(activeStage) && activeStage < 5 && (
                 <button
                   onClick={() => nextStage()}
@@ -351,7 +491,8 @@ export default function ChatPanel() {
                   key={chip}
                   type="button"
                   onClick={() => handleChipClick(chip)}
-                  className="bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 rounded-full px-4 py-1.5 text-xs font-medium backdrop-blur-md transition-all duration-200 active:scale-95 shrink-0"
+                  disabled={isAutoRunning}
+                  className="bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 rounded-full px-4 py-1.5 text-xs font-medium backdrop-blur-md transition-all duration-200 active:scale-95 shrink-0 disabled:opacity-30"
                 >
                   {chip}
                 </button>
@@ -366,11 +507,11 @@ export default function ChatPanel() {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={isLoading ? "AI is responding..." : "Type your message..."}
-                disabled={isLoading}
+                placeholder={isAutoRunning ? "Auto generating..." : isLoading ? "AI is responding..." : "Ketik ide app kamu..."}
+                disabled={isLoading || isAutoRunning}
                 className="flex-1 bg-transparent text-sm text-white/90 placeholder-white/30 outline-none min-w-0 disabled:opacity-50"
               />
-              {hasMicSupport && (
+              {hasMicSupport && !isAutoRunning && (
                 <button
                   type="button"
                   onClick={toggleListening}
@@ -385,10 +526,21 @@ export default function ChatPanel() {
                   {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                 </button>
               )}
+              {/* Tombol ⚡ Auto Generate All */}
+              <button
+                type="button"
+                onClick={handleAutoGenerateAll}
+                disabled={isLoading || isAutoRunning || !input.trim()}
+                className="shrink-0 w-8 h-8 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/40 text-yellow-300 flex items-center justify-center disabled:opacity-30 transition-all duration-200"
+                title="⚡ Auto Generate: ketik ide app → generate semua 6 bagian sekaligus"
+              >
+                {isAutoRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+              </button>
+              {/* Tombol ✨ Magic Expand */}
               <button
                 type="button"
                 onClick={handleMagicExpand}
-                disabled={isLoading || !input.trim()}
+                disabled={isLoading || isAutoRunning || !input.trim()}
                 className="shrink-0 w-8 h-8 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 flex items-center justify-center disabled:opacity-30 transition-all duration-200"
                 title="Magic Expand (Kembangkan Ide Kasar)"
               >
@@ -396,7 +548,7 @@ export default function ChatPanel() {
               </button>
               <button
                 type="submit"
-                disabled={isLoading || !input.trim()}
+                disabled={isLoading || isAutoRunning || !input.trim()}
                 className="shrink-0 w-8 h-8 rounded-lg bg-purple-600/60 hover:bg-purple-600/80 text-white flex items-center justify-center disabled:opacity-30 transition-all duration-200"
               >
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

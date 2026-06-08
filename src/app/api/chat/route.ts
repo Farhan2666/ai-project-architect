@@ -13,14 +13,21 @@ export async function POST(req: Request) {
     const baseURL = req.headers.get("x-base-url") || undefined;
     const model = req.headers.get("x-model") || "gpt-4o";
 
-    const { messages, stage } = await req.json();
-    const coreMessages = (messages ?? []).map((msg: any) => {
-      const text = msg.parts
-        ?.filter((p: any) => p.type === "text")
-        .map((p: any) => p.text)
-        .join("") ?? msg.content ?? "";
-      return { role: msg.role ?? "user", content: text };
-    });
+    const { messages, stage, previousStageSummaries } = await req.json();
+
+    // BUG FIX: filter system messages dari client untuk cegah duplikasi system prompt
+    const coreMessages = (messages ?? [])
+      .filter((msg: any) => msg.role !== "system")
+      .map((msg: any) => {
+        const text =
+          msg.parts
+            ?.filter((p: any) => p.type === "text")
+            .map((p: any) => p.text)
+            .join("") ??
+          msg.content ??
+          "";
+        return { role: msg.role ?? "user", content: text };
+      });
 
     if (!apiKey) {
       return new Response(JSON.stringify({ error: "API Key diperlukan" }), {
@@ -45,10 +52,34 @@ export async function POST(req: Request) {
     const modelName = model || config.defaultModel;
     const lastUserMsg = coreMessages.filter((m: { role: string }) => m.role === "user").pop()?.content ?? "";
     const isMagicMode = lastUserMsg.startsWith("[MODE MAGIC]");
-    const systemPrompt = getPipelineSystemPrompt(stage ?? 0, isMagicMode);
+
+    // BUG FIX: gunakan stage dari client (bukan hardcode 0)
+    const activeStage = typeof stage === "number" ? stage : 0;
+    const systemPrompt = getPipelineSystemPrompt(activeStage, isMagicMode);
+
+    // Inject context dari stage sebelumnya saat di stage 5 (Task Breakdown)
+    let fullSystem = systemPrompt;
+    if (activeStage === 5 && previousStageSummaries && Object.keys(previousStageSummaries).length > 0) {
+      const stageNames: Record<string, string> = {
+        brand: "Brand & Identity",
+        prd: "PRD (Product Requirements)",
+        srs: "SRS (System Requirements)",
+        sdd: "SDD (System Design)",
+        ux: "UI/UX Flow",
+      };
+      const contextLines = Object.entries(previousStageSummaries as Record<string, string>)
+        .filter(([, summary]) => summary?.trim())
+        .map(([key, summary]) => `### ${stageNames[key] || key}\n${summary}`)
+        .join("\n\n");
+
+      if (contextLines) {
+        fullSystem +=
+          `\n\n---\n## KONTEKS DARI STAGE SEBELUMNYA\n` +
+          `Gunakan ringkasan berikut sebagai referensi untuk membuat task breakdown yang akurat:\n\n${contextLines}`;
+      }
+    }
 
     let llmModel;
-
     if (config.sdkType === "anthropic") {
       const client = createAnthropic({ apiKey, baseURL: effectiveBaseURL });
       llmModel = client(modelName);
@@ -62,7 +93,7 @@ export async function POST(req: Request) {
 
     const result = streamText({
       model: llmModel,
-      system: systemPrompt,
+      system: fullSystem,
       messages: coreMessages,
     });
 
