@@ -152,7 +152,7 @@ export const useProjectStore = create<ProjectState>()(
             const updates: Record<string, unknown> = {};
             if (data?.document) updates.document = data.document;
             if (data?.stages && Object.keys(data.stages).length > Object.keys(state.stages).length) {
-              const stageKeys = Object.keys(state.stages).filter(k => Object.keys(state.stages[k]).length === 0);
+              const stageKeys = (Object.keys(state.stages) as (keyof StageData)[]).filter(k => Object.keys(state.stages[k]).length === 0);
               if (stageKeys.length > 0) {
                 updates.stages = { ...state.stages, ...data.stages };
               }
