@@ -29,7 +29,7 @@ export default function SplitScreen({ left, right }: SplitScreenProps) {
         )}
         style={{
           width: hasData ? "35%" : "100%",
-          minWidth: hasData ? 0 : undefined,
+          minWidth: hasData ? 380 : undefined,
           maxWidth: hasData ? 500 : 800,
           margin: hasData ? "10px 0 10px 10px" : "0 auto",
         }}
