@@ -97,6 +97,7 @@ export default function ChatPanel() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const lastSpeechIndexRef = useRef(0);
   const isGeneratingDocRef = useRef(false);
   const [input, setInput] = useState("");
   const [isListening, setIsListening] = useState(false);
@@ -217,14 +218,18 @@ export default function ChatPanel() {
     const recognition = new SpeechRecognitionAPI();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = typeof navigator !== "undefined" ? (navigator.language || "en-US") : "en-US";
+    recognition.lang = typeof navigator !== "undefined" ? (navigator.language.startsWith("id") ? "id-ID" : navigator.language) : "en-US";
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let finalTranscript = "";
-      for (let i = event.results.length - 1; i >= 0; i--) {
+      const start = lastSpeechIndexRef.current;
+      let newText = "";
+      for (let i = start; i < event.results.length; i++) {
         const result = event.results[i];
-        if (result.isFinal) finalTranscript = result[0].transcript + " " + finalTranscript;
+        if (result.isFinal) {
+          newText += (newText ? " " : "") + result[0].transcript;
+          lastSpeechIndexRef.current = i + 1;
+        }
       }
-      if (finalTranscript) setInput((prev) => prev + finalTranscript);
+      if (newText) setInput((prev) => prev + (prev ? " " : "") + newText);
     };
     recognition.onend = () => setIsListening(false);
     recognition.onerror = () => setIsListening(false);

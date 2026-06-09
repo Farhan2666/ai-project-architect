@@ -14,7 +14,6 @@
     "@ai-sdk/openai": "^3.0.67",
     "@ai-sdk/react": "^3.0.197",
     "@base-ui/react": "^1.5.0",
-    "@tailwindcss/oxide": "^4.3.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "ai": "^6.0.195",
@@ -43,6 +42,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",
+    "@tailwindcss/oxide": "^4.3.0",
     "typescript": "^5"
   },
   "optionalDependencies": {

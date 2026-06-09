@@ -72,8 +72,10 @@ if (upstashUrl && upstashToken) {
 }
 
 export async function rateLimit(
-  key: string,
+  ip: string,
+  keyPrefix: string,
 ): Promise<{ allowed: boolean; remaining: number }> {
+  const key = `${ip}:${keyPrefix || "no-key"}`;
   if (upstashRatelimit) {
     try {
       const result = await upstashRatelimit.limit(key);

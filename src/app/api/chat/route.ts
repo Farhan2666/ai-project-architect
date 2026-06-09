@@ -37,8 +37,7 @@ export async function POST(req: Request) {
     }
 
     const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
-    const rlKey = `${ip}:${apiKey.slice(0, 8)}`;
-    const { allowed, remaining } = await rateLimit(rlKey);
+    const { allowed, remaining } = await rateLimit(ip, apiKey.slice(0, 8));
 
     if (!allowed) {
       return new Response(JSON.stringify({ error: "Too many requests. Silakan tunggu." }), {
