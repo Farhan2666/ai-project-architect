@@ -7,7 +7,7 @@ import { useProjectStore, STAGES, type StageData, type StageId } from "@/store/p
 import { useApiKeyStore } from "@/store/api-key";
 import { useToast } from "@/components/toast";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { FileText, Download, Edit3, Eye, Trash2, Upload, FileJson, FileArchive, RefreshCw, RotateCcw } from "lucide-react";
+import { FileText, Download, Edit3, Eye, Trash2, Upload, RefreshCw, RotateCcw, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { compileToTXT, compileToHTML } from "@/utils/sanitize";
 
@@ -287,90 +287,168 @@ export default function DocumentPanel() {
     URL.revokeObjectURL(url);
   }
 
+  const [openDropdown, setOpenDropdown] = useState<"export" | "more" | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpenDropdown(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleDropdown = (name: "export" | "more") => {
+    setOpenDropdown(openDropdown === name ? null : name);
+  };
+
+  const EXPORT_FORMATS = [
+    { key: "md" as const, label: "Markdown", icon: ".md" },
+    { key: "txt" as const, label: "Plain Text", icon: ".txt" },
+    { key: "html" as const, label: "HTML", icon: ".html" },
+    { key: "pdf" as const, label: "PDF", icon: ".pdf" },
+    { key: "cursorrules" as const, label: "Cursor Rules", icon: ".cursor" },
+  ];
+
+  const MORE_ACTIONS = [
+    { label: "Backup (.fictify)", icon: Download, action: handleBackup },
+    { label: "Restore from file", icon: Upload, action: handleImport },
+    { label: "Restore auto-backup", icon: RefreshCw, action: handleRestoreAutoBackup },
+    { label: "Clear document", icon: Trash2, action: handleClear },
+    { label: "Reset project", icon: RotateCcw, action: handleReset, danger: true },
+  ];
+
   return (
     <ErrorBoundary>
       <div className="flex flex-col h-full max-md:pb-14">
-        <header className="border-b border-white/10 p-4 flex items-center justify-between">
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold text-white/90 flex items-center gap-2">
-              <FileText className="w-4 h-4 shrink-0" />
-              <span className="truncate">Live Document</span>
-            </h2>
-            <p className="text-[11px] text-white/40 truncate">
-              Stage {activeStage + 1}/6: {stageInfo.label}
-              {lastBackup && <span className="ml-2 opacity-50">Auto-saved</span>}
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0 ml-2">
+        <header className="border-b border-white/10 px-3 md:px-4 py-2 md:py-3">
+          <div className="flex items-center justify-between gap-1 md:gap-2">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xs md:text-base font-semibold text-white/90 flex items-center gap-1.5 md:gap-2">
+                <FileText className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
+                <span className="truncate leading-tight">Live Document</span>
+              </h2>
+              <p className="text-[9px] md:text-[11px] text-white/40 truncate leading-tight">
+                Stage {activeStage + 1}/6: {stageInfo.label}
+                {lastBackup && <span className="ml-1.5 opacity-50 hidden md:inline">Auto-saved</span>}
+              </p>
+            </div>
             {hasData && (
-              <>
+              <div className="flex items-center gap-0.5 md:gap-1 shrink-0" ref={dropdownRef}>
                 {isEditing ? (
                   <>
-                    <button onClick={handleSaveEdit} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-purple-600/50 hover:bg-purple-600/70 text-white/90 flex items-center gap-1 transition-colors">
+                    <button onClick={handleSaveEdit} className="text-[10px] md:text-[11px] px-1.5 md:px-2.5 py-1 rounded-lg bg-purple-600/50 hover:bg-purple-600/70 text-white/90 flex items-center gap-0.5 md:gap-1 transition-colors shrink-0 whitespace-nowrap">
                       <Eye className="w-3 h-3" />
-                      Save
+                      <span className="hidden md:inline">Save</span>
                     </button>
-                    <button onClick={handleCancelEdit} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 flex items-center gap-1 transition-colors">
+                    <button onClick={handleCancelEdit} className="text-[10px] md:text-[11px] px-1.5 md:px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 transition-colors shrink-0 whitespace-nowrap">
                       Cancel
                     </button>
                   </>
                 ) : (
                   <>
-                    <button onClick={handleEdit} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors" title="Edit document">
-                      <Edit3 className="w-3 h-3" />
-                      Edit
+                    {/*
+                     * DESKTOP: all buttons visible
+                     * MOBILE: only Edit + 2 dropdowns (Export + More)
+                     */}
+                    <button onClick={handleEdit} className="p-1 md:px-2 md:py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 transition-colors shrink-0" title="Edit document">
+                      <Edit3 className="w-3.5 h-3.5 md:w-4 md:h-4" />
                     </button>
-                    <button onClick={handleClear} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors" title="Clear document">
-                      <Trash2 className="w-3 h-3" />
+
+                    {/* Backup/Restore — desktop only */}
+                    <button onClick={handleBackup} className="hidden md:flex p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 transition-colors shrink-0" title="Backup (.fictify)">
+                      <Download className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={handleReset} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-red-950/50 hover:bg-red-950/70 text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors" title="Reset seluruh project">
-                      <RotateCcw className="w-3 h-3" />
-                      Reset
+                    <button onClick={handleImport} className="hidden md:flex p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 transition-colors shrink-0" title="Restore from backup">
+                      <Upload className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={handleBackup} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors" title="Backup (.fictify)">
-                      <Download className="w-3 h-3" />
-                      Backup
+                    <button onClick={handleRestoreAutoBackup} className="hidden md:flex p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 transition-colors shrink-0" title="Restore auto-backup">
+                      <RefreshCw className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={handleImport} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors" title="Restore from backup">
-                      <Upload className="w-3 h-3" />
-                      Restore
+                    <button onClick={handleClear} className="hidden md:flex p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 transition-colors shrink-0" title="Clear document">
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={handleRestoreAutoBackup} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors" title="Restore auto-backup">
-                      <RefreshCw className="w-3 h-3" />
-                      Auto
+                    <button onClick={handleReset} className="hidden md:flex p-1.5 rounded-lg bg-red-950/50 hover:bg-red-950/70 text-red-400 hover:text-red-300 transition-colors shrink-0" title="Reset seluruh project">
+                      <RotateCcw className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => handleExport("md")} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors">
-                      .md
-                    </button>
-                    <button onClick={() => handleExport("txt")} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors">
-                      .txt
-                    </button>
-                    <button onClick={() => handleExport("html")} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors">
-                      .html
-                    </button>
-                    <button onClick={() => handleExport("pdf")} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors">
-                      .pdf
-                    </button>
-                    <button onClick={() => handleExport("cursorrules")} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 flex items-center gap-1 transition-colors">
-                      .cursor
-                    </button>
+
+                    {/* Export dropdown */}
+                    <div className="relative">
+                      <button
+                        onClick={() => toggleDropdown("export")}
+                        className="px-1.5 md:px-2.5 py-1 md:py-1.5 rounded-lg bg-purple-600/40 hover:bg-purple-600/60 text-purple-200 flex items-center gap-0.5 md:gap-1 transition-colors shrink-0 whitespace-nowrap"
+                      >
+                        <Download className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                        <span className="hidden md:inline text-[11px]">Export</span>
+                        <ChevronDown className={`w-2 h-2 md:w-2.5 md:h-2.5 transition-transform ${openDropdown === "export" ? "rotate-180" : ""}`} />
+                      </button>
+                      {openDropdown === "export" && (
+                        <div className="absolute right-0 top-full mt-1 z-50 min-w-[130px] md:min-w-[140px] bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl shadow-purple-950/30 overflow-hidden">
+                          {EXPORT_FORMATS.map((fmt) => (
+                            <button
+                              key={fmt.key}
+                              onClick={() => { handleExport(fmt.key); setOpenDropdown(null); }}
+                              className="w-full flex items-center gap-2 px-2.5 md:px-3 py-1.5 md:py-2 text-[10px] md:text-xs text-white/70 hover:text-white hover:bg-white/5 transition-colors text-left"
+                            >
+                              <span className="font-mono text-purple-300 w-7 md:w-8">{fmt.icon}</span>
+                              <span className="hidden md:inline">{fmt.label}</span>
+                              <span className="md:hidden">{fmt.icon}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* More actions dropdown (mobile only) */}
+                    <div className="relative md:hidden">
+                      <button
+                        onClick={() => toggleDropdown("more")}
+                        className="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 transition-colors shrink-0"
+                        title="More actions"
+                      >
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openDropdown === "more" ? "rotate-180" : ""}`} />
+                      </button>
+                      {openDropdown === "more" && (
+                        <div className="absolute right-0 top-full mt-1 z-50 min-w-[150px] bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl shadow-purple-950/30 overflow-hidden">
+                          {MORE_ACTIONS.map((act) => {
+                            const Icon = act.icon;
+                            return (
+                              <button
+                                key={act.label}
+                                onClick={() => { act.action(); setOpenDropdown(null); }}
+                                className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors text-left ${
+                                  (act as any).danger
+                                    ? "text-red-400 hover:text-red-300 hover:bg-red-950/30"
+                                    : "text-white/70 hover:text-white hover:bg-white/5"
+                                }`}
+                              >
+                                <Icon className="w-3.5 h-3.5 shrink-0" />
+                                {act.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
-              </>
+              </div>
             )}
           </div>
         </header>
 
-        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/5 overflow-x-auto">
+        <div className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 border-b border-white/5 overflow-x-auto scrollbar-none">
           {STAGES.map((s) => {
             const entry = stageDataEntries[s.id];
             const isComplete = entry?.hasData;
             return (
-                <button
-                  key={s.id}
-                  onClick={() => setActiveStage(s.id)}
+              <button
+                key={s.id}
+                onClick={() => setActiveStage(s.id)}
                 className={cn(
-                  "h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-medium transition-all shrink-0",
+                  "h-6 md:h-7 w-6 md:w-7 rounded-full flex items-center justify-center text-[9px] md:text-[10px] font-medium transition-all shrink-0",
                   s.id === activeStage
                     ? "bg-purple-600/60 text-white ring-2 ring-purple-400/30"
                     : isComplete
@@ -387,7 +465,7 @@ export default function DocumentPanel() {
 
         <input ref={importRef} type="file" accept=".fictify,.json" onChange={handleFileChange} className="hidden" />
 
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-3 md:p-5">
           {!apiKey ? (
             <div className="flex items-center justify-center h-full">
               <p className="text-sm text-white/40">Set your API Key to begin.</p>

@@ -1,7 +1,22 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { setDocumentData, deleteProjectData } from "@/lib/db";
-import { getDocumentData } from "@/lib/db";
+import { setDocumentData, deleteProjectData, getDocumentData } from "@/lib/db";
+
+const BACKUP_KEY = "ai-project-architect-backup";
+
+function saveAutoBackup(state: ProjectState) {
+  try {
+    const payload = JSON.stringify({
+      appName: state.appName,
+      stages: state.stages,
+      document: state.document,
+      completedStages: state.completedStages,
+      activeStage: state.activeStage,
+      backedUpAt: new Date().toISOString(),
+    });
+    localStorage.setItem(BACKUP_KEY, payload);
+  } catch {}
+}
 
 export const STAGES = [
   { id: 0, label: "Brand & Identity", short: "Brand" },
@@ -86,12 +101,14 @@ export const useProjectStore = create<ProjectState>()(
       setDocument: (doc) => {
         set({ document: doc });
         setDocumentData(doc);
+        saveAutoBackup(useProjectStore.getState());
       },
 
       appendDocument: (text) => {
         const doc = get().document + "\n" + text;
         set({ document: doc });
         setDocumentData(doc);
+        saveAutoBackup(useProjectStore.getState());
       },
 
       markStageComplete: (stage) => {
@@ -116,8 +133,35 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       hydrateDocument: async () => {
+        const state = useProjectStore.getState();
+        if (state.document) return;
+
+        // 1. Try Dexie (primary persistent store for large documents)
         const doc = await getDocumentData();
-        if (doc) set({ document: doc });
+        if (doc) {
+          set({ document: doc });
+          saveAutoBackup(useProjectStore.getState());
+          return;
+        }
+
+        // 2. Try auto-backup (localStorage fallback)
+        try {
+          const raw = localStorage.getItem("ai-project-architect-backup");
+          if (raw) {
+            const data = JSON.parse(raw);
+            const updates: Record<string, unknown> = {};
+            if (data?.document) updates.document = data.document;
+            if (data?.stages && Object.keys(data.stages).length > Object.keys(state.stages).length) {
+              const stageKeys = Object.keys(state.stages).filter(k => Object.keys(state.stages[k]).length === 0);
+              if (stageKeys.length > 0) {
+                updates.stages = { ...state.stages, ...data.stages };
+              }
+            }
+            if (Object.keys(updates).length > 0) {
+              set(updates);
+            }
+          }
+        } catch {}
       },
     }),
     {

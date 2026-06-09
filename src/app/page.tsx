@@ -17,6 +17,10 @@ export default function Home() {
     }
   }, []);
 
+  useEffect(() => {
+    useProjectStore.getState().hydrateDocument();
+  }, []);
+
   return (
     <>
       <ByokModal />
