@@ -374,6 +374,7 @@ Format output dalam Markdown yang rapi dengan heading jelas. Jadilah spesifik da
           body: JSON.stringify({
             stage: i,
             prompt: stagePrompt,
+            ...(i === 3 && { previousStageSummaries: generatedSummaries }),
           }),
         });
 

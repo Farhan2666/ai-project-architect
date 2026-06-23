@@ -9,7 +9,7 @@ import { useToast } from "@/components/toast";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { FileText, Download, Edit3, Eye, Trash2, Upload, RefreshCw, RotateCcw, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { compileToTXT, compileToHTML } from "@/utils/sanitize";
+import { compileToTXT, compileToHTML, extractCompetitiveAnalysis } from "@/utils/sanitize";
 
 const BACKUP_KEY = "ai-project-architect-backup";
 const BACKUP_INTERVAL = 60000;
@@ -111,16 +111,16 @@ export default function DocumentPanel() {
   }, [startAutoBackup]);
 
   const handleExport = async (format: "md" | "cursorrules" | "txt" | "html" | "pdf") => {
-    const fullDoc = generateFullDocument(stages as unknown as Record<string, Record<string, string>>, appName);
+    const fullDoc = generateFullDocument(stages as unknown as Record<string, Record<string, string>>, appName, docContent);
 
     if (format === "txt") {
-      const txt = compileToTXT(stages as unknown as Record<string, Record<string, string>>, appName);
+      const txt = compileToTXT(stages as unknown as Record<string, Record<string, string>>, appName, docContent);
       downloadBlob(txt, "text/plain", appName ? `${appName.toLowerCase().replace(/\s+/g, "-")}-brief.txt` : "project-brief.txt");
       show("Exported as .txt");
       return;
     }
     if (format === "html") {
-      const html = compileToHTML(stages as unknown as Record<string, Record<string, string>>, appName);
+      const html = compileToHTML(stages as unknown as Record<string, Record<string, string>>, appName, docContent);
       downloadBlob(html, "text/html", appName ? `${appName.toLowerCase().replace(/\s+/g, "-")}-brief.html` : "project-brief.html");
       show("Exported as .html");
       return;
@@ -170,6 +170,18 @@ export default function DocumentPanel() {
             }
             yOffset += 6;
           }
+        }
+
+        const caSection = extractCompetitiveAnalysis(docContent);
+        if (caSection) {
+          if (yOffset > 250) { doc.addPage(); yOffset = 20; }
+          doc.setFontSize(14);
+          doc.text("Competitive Analysis", 20, yOffset);
+          yOffset += 8;
+          doc.setFontSize(10);
+          const caText = caSection.replace(/^## 🔍 Competitive Analysis\s*/, "");
+          const lines = doc.splitTextToSize(caText, 170);
+          doc.text(lines, 20, yOffset);
         }
 
         doc.save(appName ? `${appName.toLowerCase().replace(/\s+/g, "-")}-brief.pdf` : "project-brief.pdf");
@@ -498,7 +510,8 @@ export default function DocumentPanel() {
 
 function generateFullDocument(
   stages: Record<string, Record<string, string>>,
-  appName: string
+  appName: string,
+  docContent: string = ""
 ): string {
   const title = appName || "AI Project Architect Brief";
   const now = new Date().toISOString().split("T")[0];
@@ -522,6 +535,11 @@ function generateFullDocument(
       }
     }
   });
+
+  const caSection = extractCompetitiveAnalysis(docContent);
+  if (caSection) {
+    doc += `\n${caSection}\n\n---\n\n`;
+  }
 
   return doc;
 }

@@ -54,7 +54,7 @@ export async function POST(req: Request) {
 
     // BUG FIX: gunakan stage dari client (bukan hardcode 0)
     const activeStage = typeof stage === "number" ? stage : 0;
-    const systemPrompt = getPipelineSystemPrompt(activeStage, isMagicMode);
+    const systemPrompt = getPipelineSystemPrompt(activeStage, isMagicMode, previousStageSummaries);
 
     // Inject context dari stage sebelumnya saat di stage 5 (Task Breakdown)
     let fullSystem = systemPrompt;

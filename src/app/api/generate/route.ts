@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     const baseURL = req.headers.get("x-base-url") || undefined;
     const model = req.headers.get("x-model") || "gpt-4o";
 
-    const { prompt, stage } = await req.json();
+    const { prompt, stage, previousStageSummaries } = await req.json();
 
     if (!prompt || typeof prompt !== "string") {
       return new Response(JSON.stringify({ error: "Prompt diperlukan" }), {
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     // Untuk stage 0–5, pakai system prompt spesifik per stage
     // Gunakan isMagicMode = true agar AI langsung menghasilkan dokumen final tanpa interaksi
     const stageIndex = typeof stage === "number" ? stage : 0;
-    const systemPrompt = getPipelineSystemPrompt(stageIndex, true);
+    const systemPrompt = getPipelineSystemPrompt(stageIndex, true, previousStageSummaries);
 
     let llmModel;
     if (config.sdkType === "anthropic") {

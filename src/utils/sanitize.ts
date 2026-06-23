@@ -57,7 +57,7 @@ export function safeParseJSON<T>(raw: string): { data: T | null; error: string |
   }
 }
 
-export function compileToTXT(stages: Record<string, Record<string, string>>, appName: string): string {
+export function compileToTXT(stages: Record<string, Record<string, string>>, appName: string, docContent: string = ""): string {
   const title = appName || "Project Brief";
   const labels = ["Brand & Identity", "PRD", "SRS", "SDD", "UI/UX Flow", "Task Breakdown"];
   const keys = ["brand", "prd", "srs", "sdd", "ux", "tasks"];
@@ -75,10 +75,21 @@ export function compileToTXT(stages: Record<string, Record<string, string>>, app
     }
   });
 
+  const caSection = extractCompetitiveAnalysis(docContent);
+  if (caSection) {
+    out += `Competitive Analysis\n${"=".repeat(20)}\n\n${caSection.replace(/^## 🔍 Competitive Analysis\s*/, "")}\n`;
+  }
+
   return out;
 }
 
-export function compileToHTML(stages: Record<string, Record<string, string>>, appName: string): string {
+export function extractCompetitiveAnalysis(docContent: string): string {
+  if (!docContent) return "";
+  const match = docContent.match(/## 🔍 Competitive Analysis[\s\S]*/);
+  return match ? match[0] : "";
+}
+
+export function compileToHTML(stages: Record<string, Record<string, string>>, appName: string, docContent: string = ""): string {
   const title = appName || "Project Brief";
   const labels = ["Brand & Identity", "PRD", "SRS", "SDD", "UI/UX Flow", "Task Breakdown"];
   const keys = ["brand", "prd", "srs", "sdd", "ux", "tasks"];
@@ -95,6 +106,11 @@ export function compileToHTML(stages: Record<string, Record<string, string>>, ap
       body += "</dl></section>";
     }
   });
+
+  const caSection = extractCompetitiveAnalysis(docContent);
+  if (caSection) {
+    body += `<section style="margin-bottom:2rem"><h2 style="color:#e2e8f0;border-bottom:1px solid #334155;padding-bottom:0.5rem">Competitive Analysis</h2><pre style="background:#1e293b;padding:1rem;border-radius:0.5rem;color:#cbd5e1;white-space:pre-wrap;font-size:0.875rem">${caSection.replace(/^## 🔍 Competitive Analysis\s*/, "")}</pre></section>`;
+  }
 
   return `<!DOCTYPE html>
 <html lang="en">
