@@ -339,11 +339,11 @@ export default function DocumentPanel() {
           <div className="flex items-center justify-between gap-1 md:gap-2">
             <div className="min-w-0 flex-1">
               <h2 className="text-xs md:text-base font-semibold text-white/90 flex items-center gap-1.5 md:gap-2">
-                <FileText className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
+                <FileText className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0 text-purple-400/70" />
                 <span className="truncate leading-tight">Live Document</span>
               </h2>
               <p className="text-[9px] md:text-[11px] text-white/40 truncate leading-tight">
-                Stage {activeStage + 1}/6: {stageInfo.label}
+                Stage {activeStage + 1}/6: <span className="text-purple-300/60">{stageInfo.label}</span>
                 {lastBackup && <span className="ml-1.5 opacity-50 hidden md:inline">Auto-saved</span>}
               </p>
             </div>
@@ -397,12 +397,13 @@ export default function DocumentPanel() {
                         <ChevronDown className={`w-2 h-2 md:w-2.5 md:h-2.5 transition-transform ${openDropdown === "export" ? "rotate-180" : ""}`} />
                       </button>
                       {openDropdown === "export" && (
-                        <div className="absolute right-0 top-full mt-1 z-50 min-w-[130px] md:min-w-[140px] bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl shadow-purple-950/30 overflow-hidden">
-                          {EXPORT_FORMATS.map((fmt) => (
+                        <div className="absolute right-0 top-full mt-1 z-50 min-w-[130px] md:min-w-[140px] bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl shadow-purple-950/30 overflow-hidden scale-in">
+                          {EXPORT_FORMATS.map((fmt, idx) => (
                             <button
                               key={fmt.key}
                               onClick={() => { handleExport(fmt.key); setOpenDropdown(null); }}
-                              className="w-full flex items-center gap-2 px-2.5 md:px-3 py-1.5 md:py-2 text-[10px] md:text-xs text-white/70 hover:text-white hover:bg-white/5 transition-colors text-left"
+                              className="w-full flex items-center gap-2 px-2.5 md:px-3 py-1.5 md:py-2 text-[10px] md:text-xs text-white/70 hover:text-white hover:bg-white/5 transition-all duration-200 text-left fade-in"
+                              style={{ animationDelay: `${idx * 0.04}s` }}
                             >
                               <span className="font-mono text-purple-300 w-7 md:w-8">{fmt.icon}</span>
                               <span className="hidden md:inline">{fmt.label}</span>
@@ -423,18 +424,19 @@ export default function DocumentPanel() {
                         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openDropdown === "more" ? "rotate-180" : ""}`} />
                       </button>
                       {openDropdown === "more" && (
-                        <div className="absolute right-0 top-full mt-1 z-50 min-w-[150px] bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl shadow-purple-950/30 overflow-hidden">
-                          {MORE_ACTIONS.map((act) => {
+                        <div className="absolute right-0 top-full mt-1 z-50 min-w-[150px] bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl shadow-purple-950/30 overflow-hidden scale-in">
+                          {MORE_ACTIONS.map((act, idx) => {
                             const Icon = act.icon;
                             return (
                               <button
                                 key={act.label}
                                 onClick={() => { act.action(); setOpenDropdown(null); }}
-                                className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors text-left ${
+                                className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-all duration-200 text-left fade-in ${
                                   (act as any).danger
                                     ? "text-red-400 hover:text-red-300 hover:bg-red-950/30"
                                     : "text-white/70 hover:text-white hover:bg-white/5"
                                 }`}
+                                style={{ animationDelay: `${idx * 0.04}s` }}
                               >
                                 <Icon className="w-3.5 h-3.5 shrink-0" />
                                 {act.label}
@@ -460,12 +462,12 @@ export default function DocumentPanel() {
                 key={s.id}
                 onClick={() => setActiveStage(s.id)}
                 className={cn(
-                  "h-6 md:h-7 w-6 md:w-7 rounded-full flex items-center justify-center text-[9px] md:text-[10px] font-medium transition-all shrink-0",
+                  "h-6 md:h-7 w-6 md:w-7 rounded-full flex items-center justify-center text-[9px] md:text-[10px] font-medium transition-all duration-300 shrink-0 hover:scale-110 active:scale-95",
                   s.id === activeStage
-                    ? "bg-purple-600/60 text-white ring-2 ring-purple-400/30"
+                    ? "bg-gradient-to-br from-purple-600 to-purple-700 text-white ring-2 ring-purple-400/30 shadow-lg shadow-purple-950/30"
                     : isComplete
-                    ? "bg-purple-600/20 text-purple-300/70 hover:bg-purple-600/30 cursor-pointer"
-                    : "bg-white/5 text-white/30"
+                    ? "bg-purple-600/20 text-purple-300/70 hover:bg-purple-600/30 cursor-pointer border border-purple-500/20"
+                    : "bg-white/5 text-white/30 hover:bg-white/10 cursor-pointer"
                 )}
                 title={s.label}
               >
@@ -477,17 +479,25 @@ export default function DocumentPanel() {
 
         <input ref={importRef} type="file" accept=".fictify,.json" onChange={handleFileChange} className="hidden" />
 
-        <div className="flex-1 overflow-y-auto p-3 md:p-5">
+          <div className="flex-1 overflow-y-auto p-3 md:p-5">
           {!apiKey ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-sm text-white/40">Set your API Key to begin.</p>
+            <div className="flex items-center justify-center h-full fade-in">
+              <div className="text-center">
+                <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center float-animation">
+                  <FileText className="w-6 h-6 text-white/20" />
+                </div>
+                <p className="text-sm text-white/40">Set your API Key to begin.</p>
+              </div>
             </div>
           ) : !hasData ? (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center h-full fade-in">
               <div className="text-center max-w-sm">
-                <FileText className="w-8 h-8 text-white/20 mx-auto mb-2" />
-                <p className="text-sm text-white/40">
-                  Start a conversation. Your document will appear here.
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-purple-600/10 border border-purple-500/20 flex items-center justify-center float-animation">
+                  <FileText className="w-7 h-7 text-purple-400/50" />
+                </div>
+                <p className="text-sm font-medium text-white/70 mb-1">Belum ada dokumen</p>
+                <p className="text-xs text-white/40 leading-relaxed">
+                  Mulai percakapan di panel kiri. Dokumen akan muncul di sini secara real-time.
                 </p>
               </div>
             </div>
@@ -498,7 +508,7 @@ export default function DocumentPanel() {
               className="w-full h-full min-h-[300px] bg-transparent text-sm text-white/80 font-mono leading-relaxed outline-none resize-none"
             />
           ) : (
-            <article className="prose prose-sm prose-invert max-w-none">
+            <article className="prose prose-sm prose-invert max-w-none fade-in">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{docContent}</ReactMarkdown>
             </article>
           )}

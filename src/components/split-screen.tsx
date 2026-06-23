@@ -34,14 +34,7 @@ export default function SplitScreen({ left, right }: SplitScreenProps) {
           margin: hasData ? "10px 0 10px 10px" : "0 auto",
         }}
       >
-        <div
-          className={cn(
-            "flex flex-col h-full overflow-hidden",
-            hasData
-              ? "bg-slate-950/40 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-purple-950/20"
-              : "bg-slate-950/40 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-purple-950/20"
-          )}
-        >
+        <div className="glass-panel flex flex-col h-full overflow-hidden rounded-2xl shadow-2xl shadow-purple-950/20 transition-all duration-400">
           {left}
         </div>
       </motion.div>
@@ -62,7 +55,7 @@ export default function SplitScreen({ left, right }: SplitScreenProps) {
             )}
             style={{ flex: 1, minWidth: 0, margin: "10px 10px 10px 0" }}
           >
-            <div className="flex flex-col h-full rounded-2xl bg-slate-950/40 backdrop-blur-xl border border-white/10 overflow-hidden">
+            <div className="glass-panel flex flex-col h-full rounded-2xl overflow-hidden">
               {right}
             </div>
           </motion.div>
@@ -74,22 +67,36 @@ export default function SplitScreen({ left, right }: SplitScreenProps) {
         <button
           onClick={() => setMobileTab("chat")}
           className={cn(
-            "flex flex-col items-center gap-0.5 text-[10px] font-medium transition-colors",
+            "flex flex-col items-center gap-0.5 text-[10px] font-medium transition-all duration-300 relative py-1 px-4",
             mobileTab === "chat" ? "text-white" : "text-white/50"
           )}
         >
-          <MessageSquare className="w-5 h-5" />
-          Chat
+          {mobileTab === "chat" && (
+            <motion.div
+              layoutId="mobile-tab-indicator"
+              className="absolute inset-0 bg-white/5 rounded-xl"
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            />
+          )}
+          <MessageSquare className="w-5 h-5 relative z-10" />
+          <span className="relative z-10">Chat</span>
         </button>
         <button
           onClick={() => setMobileTab("doc")}
           className={cn(
-            "flex flex-col items-center gap-0.5 text-[10px] font-medium transition-colors",
+            "flex flex-col items-center gap-0.5 text-[10px] font-medium transition-all duration-300 relative py-1 px-4",
             mobileTab === "doc" ? "text-white" : "text-white/50"
           )}
         >
-          <FileText className="w-5 h-5" />
-          Document
+          {mobileTab === "doc" && (
+            <motion.div
+              layoutId="mobile-tab-indicator"
+              className="absolute inset-0 bg-white/5 rounded-xl"
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            />
+          )}
+          <FileText className="w-5 h-5 relative z-10" />
+          <span className="relative z-10">Document</span>
         </button>
       </div>
     </div>

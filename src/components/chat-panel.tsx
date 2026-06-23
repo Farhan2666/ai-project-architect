@@ -419,17 +419,19 @@ Format output dalam Markdown yang rapi dengan heading jelas. Jadilah spesifik da
       <header className="border-b border-white/10 p-4">
         <div className="flex items-center justify-between">
           <div className="min-w-0">
-            <h1 className="text-lg font-semibold text-white/90 truncate">AI Project Architect</h1>
+            <h1 className="text-lg font-semibold text-white/90 truncate flex items-center gap-2">
+              <span className="bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">AI Project Architect</span>
+            </h1>
             <p className="text-xs text-white/50 truncate">
               {appName ? `${appName} — ` : ""}
               {isAutoRunning && autoProgress
                 ? `⚡ Auto-generating ${autoProgress.current}/6: ${autoProgress.label}...`
-                : `Stage ${activeStage + 1}/6: ${stageInfo.label}`}
+                : `Stage ${activeStage + 1}/6: <span className="text-purple-300/60">${stageInfo.label}</span>`}
             </p>
           </div>
           <button
             onClick={openModal}
-            className="shrink-0 ml-2 w-8 h-8 rounded-lg flex items-center justify-center text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+            className="shrink-0 ml-2 w-8 h-8 rounded-xl flex items-center justify-center text-white/50 hover:text-white hover:bg-white/5 transition-all duration-200 hover:scale-105 active:scale-95"
             title={`API Key: ${provider}`}
           >
             <Key className="w-4 h-4" />
@@ -478,10 +480,13 @@ Format output dalam Markdown yang rapi dengan heading jelas. Jadilah spesifik da
         <>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.length === 0 && !isAutoRunning && (
-              <div className="flex items-center justify-center h-full">
+              <div className="flex items-center justify-center h-full fade-in">
                 <div className="text-center max-w-sm">
-                  <p className="text-sm font-medium text-white/80 mb-1">{stageInfo.label}</p>
-                  <p className="text-xs text-white/40">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-purple-600/10 border border-purple-500/20 flex items-center justify-center float-animation">
+                    <Sparkles className="w-7 h-7 text-purple-400/70" />
+                  </div>
+                  <p className="text-sm font-semibold text-white/90 mb-1">{stageInfo.label}</p>
+                  <p className="text-xs text-white/40 leading-relaxed">
                     {activeStage === 0 && "Let's define your app's brand and identity."}
                     {activeStage === 1 && "Let's define the product requirements."}
                     {activeStage === 2 && "Let's define system requirements."}
@@ -489,7 +494,7 @@ Format output dalam Markdown yang rapi dengan heading jelas. Jadilah spesifik da
                     {activeStage === 4 && "Let's map out the user experience."}
                     {activeStage === 5 && "Let's break down tasks into sprints."}
                   </p>
-                  <p className="text-xs text-yellow-400/60 mt-3">
+                  <p className="text-xs text-yellow-400/60 mt-3 fade-in" style={{ animationDelay: "0.2s" }}>
                     💡 Ketik ide app kamu lalu klik ⚡ untuk auto-generate semua 6 bagian sekaligus
                   </p>
                 </div>
@@ -497,26 +502,44 @@ Format output dalam Markdown yang rapi dengan heading jelas. Jadilah spesifik da
             )}
 
             {isAutoRunning && (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <Zap className="w-8 h-8 text-yellow-400 animate-pulse mx-auto mb-3" />
-                  <p className="text-sm text-white/70 font-medium">Sedang generate semua bagian...</p>
+              <div className="flex items-center justify-center h-full fade-in">
+                <div className="text-center glass-panel rounded-2xl px-8 py-6">
+                  <div className="w-14 h-14 mx-auto mb-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
+                    <Zap className="w-7 h-7 text-yellow-400 animate-pulse" />
+                  </div>
+                  <p className="text-sm text-white/80 font-medium">Sedang generate semua bagian...</p>
                   <p className="text-xs text-white/40 mt-1">
                     {autoProgress ? `${autoProgress.current}/6 — ${autoProgress.label}` : "Memulai..."}
                   </p>
+                  {autoProgress && autoProgress.current > 0 && (
+                    <div className="flex gap-1.5 justify-center mt-3">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                            i < autoProgress.current
+                              ? "bg-purple-500 scale-100"
+                              : i === autoProgress.current
+                              ? "bg-yellow-400 scale-125 dot-bounce"
+                              : "bg-white/10 scale-75"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
 
             {!isAutoRunning && messages
               .filter((m) => m.role !== "system")
-              .map((m) => (
-                <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              .map((m, idx) => (
+                <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"} message-enter`} style={{ animationDelay: `${Math.min(idx * 0.05, 0.3)}s` }}>
                   <div
-                    className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm leading-relaxed ${
+                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                       m.role === "user"
-                        ? "bg-purple-600/40 backdrop-blur-sm text-white/90 border border-purple-400/20"
-                        : "bg-white/5 text-white/80 border border-white/5"
+                        ? "bg-gradient-to-br from-purple-600/50 to-purple-700/40 backdrop-blur-sm text-white/90 border border-purple-400/20 shadow-lg shadow-purple-950/20"
+                        : "bg-white/5 text-white/80 border border-white/5 hover:border-white/10 transition-colors"
                     }`}
                   >
                     <article className="prose prose-sm prose-invert max-w-none break-words">
@@ -529,10 +552,14 @@ Format output dalam Markdown yang rapi dengan heading jelas. Jadilah spesifik da
               ))}
 
             {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-white/5 rounded-xl px-4 py-2.5 flex items-center gap-2 text-sm text-white/50 border border-white/5">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Thinking...
+              <div className="flex justify-start message-enter">
+                <div className="bg-white/5 rounded-2xl px-4 py-3 flex items-center gap-2.5 text-sm text-white/50 border border-white/5">
+                  <div className="flex gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-purple-400 dot-bounce" style={{ animationDelay: "0s" }} />
+                    <div className="w-1.5 h-1.5 rounded-full bg-purple-400 dot-bounce" style={{ animationDelay: "0.15s" }} />
+                    <div className="w-1.5 h-1.5 rounded-full bg-purple-400 dot-bounce" style={{ animationDelay: "0.3s" }} />
+                  </div>
+                  <span className="text-xs">Thinking...</span>
                 </div>
               </div>
             )}
@@ -575,13 +602,14 @@ Format output dalam Markdown yang rapi dengan heading jelas. Jadilah spesifik da
 
           <div className="px-4 pb-2">
             <div className="flex overflow-x-auto whitespace-nowrap gap-2 scrollbar-none pb-2 px-1">
-              {suggestions.map((chip) => (
+              {suggestions.map((chip, idx) => (
                 <button
                   key={chip}
                   type="button"
                   onClick={() => handleChipClick(chip)}
                   disabled={isAutoRunning}
-                  className="bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 rounded-full px-4 py-1.5 text-xs font-medium backdrop-blur-md transition-all duration-200 active:scale-95 shrink-0 disabled:opacity-30"
+                  className="bg-white/5 hover:bg-purple-600/20 border border-white/10 hover:border-purple-500/30 text-white/80 hover:text-purple-200 rounded-full px-4 py-1.5 text-xs font-medium backdrop-blur-md transition-all duration-200 active:scale-95 shrink-0 disabled:opacity-30 fade-in hover-lift"
+                  style={{ animationDelay: `${idx * 0.06}s` }}
                 >
                   {chip}
                 </button>
@@ -590,7 +618,7 @@ Format output dalam Markdown yang rapi dengan heading jelas. Jadilah spesifik da
           </div>
 
           <div className="px-4 pb-4">
-            <form onSubmit={handleSubmit} className="flex items-center gap-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl px-3 py-2">
+            <form onSubmit={handleSubmit} className="flex items-center gap-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl px-3 py-2 glow-on-focus transition-all duration-300 hover:border-white/15 hover:bg-white/[0.07]">
               <input
                 ref={inputRef}
                 type="text"
@@ -620,7 +648,7 @@ Format output dalam Markdown yang rapi dengan heading jelas. Jadilah spesifik da
                 type="button"
                 onClick={handleAutoGenerateAll}
                 disabled={isLoading || isAutoRunning || !input.trim()}
-                className="shrink-0 w-8 h-8 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/40 text-yellow-300 flex items-center justify-center disabled:opacity-30 transition-all duration-200"
+                className="shrink-0 w-8 h-8 rounded-xl bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 flex items-center justify-center disabled:opacity-30 transition-all duration-200 hover:scale-105 active:scale-95"
                 title="⚡ Auto Generate: ketik ide app → generate semua 6 bagian sekaligus"
               >
                 {isAutoRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
@@ -630,7 +658,7 @@ Format output dalam Markdown yang rapi dengan heading jelas. Jadilah spesifik da
                 type="button"
                 onClick={handleMagicExpand}
                 disabled={isLoading || isAutoRunning || !input.trim()}
-                className="shrink-0 w-8 h-8 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 flex items-center justify-center disabled:opacity-30 transition-all duration-200"
+                className="shrink-0 w-8 h-8 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 flex items-center justify-center disabled:opacity-30 transition-all duration-200 hover:scale-105 active:scale-95"
                 title="Magic Expand (Kembangkan Ide Kasar)"
               >
                 <Sparkles className="w-4 h-4" />
@@ -638,7 +666,7 @@ Format output dalam Markdown yang rapi dengan heading jelas. Jadilah spesifik da
               <button
                 type="submit"
                 disabled={isLoading || isAutoRunning || !input.trim()}
-                className="shrink-0 w-8 h-8 rounded-lg bg-purple-600/60 hover:bg-purple-600/80 text-white flex items-center justify-center disabled:opacity-30 transition-all duration-200"
+                className="shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white flex items-center justify-center disabled:opacity-30 transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg shadow-purple-950/30"
               >
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </button>
