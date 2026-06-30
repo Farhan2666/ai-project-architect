@@ -1,8 +1,66 @@
+import { MAGIC_APP_ANALYSIS } from "@/lib/system-prompts";
+
 export interface PipelineContext {
   masterStructure: string;
   expandedSections: string[];
   compressedSummary: string;
   lore: Record<string, string[]>;
+  dataModels?: Record<string, EntitySchema>;
+  featureSpecs?: Record<string, FeatureSpec>;
+  apiContracts?: ApiContract[];
+  stateMachines?: Record<string, StateMachine>;
+}
+
+export interface EntitySchema {
+  name: string;
+  fields: EntityField[];
+  relations: EntityRelation[];
+}
+
+export interface EntityField {
+  name: string;
+  type: string;
+  required: boolean;
+  unique?: boolean;
+  default?: string;
+  description?: string;
+}
+
+export interface EntityRelation {
+  type: "one-to-many" | "many-to-many" | "one-to-one";
+  targetEntity: string;
+  viaField?: string;
+}
+
+export interface FeatureSpec {
+  name: string;
+  purpose: string;
+  inputFormat: string;
+  outputFormat: string;
+  logicFlow: string[];
+  dataStructures: string[];
+}
+
+export interface ApiContract {
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  path: string;
+  description: string;
+  requestBody?: string;
+  responseBody?: string;
+  errorCodes?: string[];
+}
+
+export interface StateMachine {
+  name: string;
+  states: string[];
+  transitions: StateTransition[];
+  initial: string;
+}
+
+export interface StateTransition {
+  from: string;
+  to: string;
+  trigger: string;
 }
 
 const DEFAULT_LORE: Record<string, string[]> = {
@@ -11,6 +69,11 @@ const DEFAULT_LORE: Record<string, string[]> = {
   design_vibe: [],
   target_audience: [],
   tech_stack: [],
+  features: [],
+  data_models: [],
+  business_logic: [],
+  user_roles: [],
+  integrations: [],
   unresolved_questions: [],
 };
 
@@ -21,25 +84,45 @@ export function extractLore(text: string, existing: Record<string, string[]> = D
   for (const line of lines) {
     const lower = line.toLowerCase();
 
-    if (lower.includes("app name") || lower.includes("application name") || lower.includes("project name")) {
-      const val = line.replace(/^.*?[::\-â€“]\s*/, "").trim();
+    if (lower.includes("app name") || lower.includes("application name") || lower.includes("project name") || lower.includes("nama aplikasi")) {
+      const val = line.replace(/^.*?[::\-â€“–]\s*/, "").trim();
       if (val && !lore.app_name.includes(val)) lore.app_name.push(val);
     }
-    if (lower.includes("concept") || lower.includes("does") || lower.includes("solves")) {
-      const val = line.replace(/^.*?[::\-â€“]\s*/, "").trim();
+    if (lower.includes("concept") || lower.includes("does") || lower.includes("solves") || lower.includes("konsep")) {
+      const val = line.replace(/^.*?[::\-â€“–]\s*/, "").trim();
       if (val && val.length > 5 && !lore.core_concept.includes(val)) lore.core_concept.push(val);
     }
-    if (lower.includes("vibe") || lower.includes("design") || lower.includes("ui") || lower.includes("style")) {
-      const val = line.replace(/^.*?[::\-â€“]\s*/, "").trim();
+    if (lower.includes("vibe") || lower.includes("design") || lower.includes("ui") || lower.includes("style") || lower.includes("tampilan")) {
+      const val = line.replace(/^.*?[::\-â€“–]\s*/, "").trim();
       if (val && !lore.design_vibe.includes(val)) lore.design_vibe.push(val);
     }
-    if (lower.includes("audience") || lower.includes("user") || lower.includes("customer")) {
-      const val = line.replace(/^.*?[::\-â€“]\s*/, "").trim();
+    if (lower.includes("audience") || lower.includes("user") || lower.includes("customer") || lower.includes("pengguna") || lower.includes("target")) {
+      const val = line.replace(/^.*?[::\-â€“–]\s*/, "").trim();
       if (val && !lore.target_audience.includes(val)) lore.target_audience.push(val);
     }
-    if (lower.includes("tech") || lower.includes("stack") || lower.includes("react") || lower.includes("database") || lower.includes("api")) {
-      const val = line.replace(/^.*?[::\-â€“]\s*/, "").trim();
+    if (lower.includes("tech") || lower.includes("stack") || lower.includes("react") || lower.includes("database") || lower.includes("api") || lower.includes("teknologi")) {
+      const val = line.replace(/^.*?[::\-â€“–]\s*/, "").trim();
       if (val && !lore.tech_stack.includes(val)) lore.tech_stack.push(val);
+    }
+    if (lower.includes("fitur") || lower.includes("feature") || lower.includes("fungsi")) {
+      const val = line.replace(/^.*?[::\-â€“–]\s*/, "").trim();
+      if (val && val.length > 4 && !lore.features.includes(val)) lore.features.push(val);
+    }
+    if (lower.includes("model") || lower.includes("entity") || lower.includes("schema") || lower.includes("tabel") || lower.includes("database") || lower.includes("struktur data")) {
+      const val = line.replace(/^.*?[::\-â€“–]\s*/, "").trim();
+      if (val && val.length > 3 && !lore.data_models.includes(val)) lore.data_models.push(val);
+    }
+    if (lower.includes("bisnis") || lower.includes("logic") || lower.includes("alur") || lower.includes("proses") || lower.includes("workflow")) {
+      const val = line.replace(/^.*?[::\-â€“–]\s*/, "").trim();
+      if (val && val.length > 5 && !lore.business_logic.includes(val)) lore.business_logic.push(val);
+    }
+    if (lower.includes("role") || lower.includes("peran") || lower.includes("admin") || lower.includes("user") || lower.includes("izin") || lower.includes("permission")) {
+      const val = line.replace(/^.*?[::\-â€“–]\s*/, "").trim();
+      if (val && !lore.user_roles.includes(val)) lore.user_roles.push(val);
+    }
+    if (lower.includes("integrasi") || lower.includes("integration") || lower.includes("api") || lower.includes("third party") || lower.includes("pihak ketiga")) {
+      const val = line.replace(/^.*?[::\-â€“–]\s*/, "").trim();
+      if (val && !lore.integrations.includes(val)) lore.integrations.push(val);
     }
   }
 
@@ -79,28 +162,53 @@ export function getPipelineSystemPrompt(
   const commonInstruction = "\n\nINSTRUKSI PENTING: \n1. Gunakan Bahasa Indonesia yang ramah dan profesional. \n2. Jadilah konsultan yang proaktif. Jangan langsung membuat dokumen final, tapi berikan masukan, ide kreatif, atau kritik membangun atas ide pengguna. \n3. Diskusikan secara bolak-balik sampai pengguna merasa idenya matang.\n4. JIKA pengguna secara spesifik meminta untuk dirangkum, difinalisasi, atau dibuatkan dokumen akhir, barulah hasilkan rangkuman terstruktur dalam format Markdown sesuai tahap ini (tanpa basa-basi).";
 
   if (isMagicMode) {
-    const magicInstruction = "\n\nPENTING: Pengguna menggunakan [MODE MAGIC] untuk mengembangkan ide kasarnya secara mandiri. " +
-      "Abaikan instruksi diskusi bolak-balik. Kamu HARUS langsung bertindak secara proaktif dan mandiri untuk:\n" +
-      "1. Menganalisis pasar secara mendalam untuk ide aplikasi tersebut.\n" +
-      "2. Mengidentifikasi minimal 2 kompetitor sejenis di dunia nyata dan jelaskan kelebihan serta kekurangan mereka secara kritis.\n" +
-      "3. Menyusun konsep aplikasi terbaik dengan Unique Selling Proposition (USP) yang jelas dan fitur-fitur pembeda yang inovatif.\n" +
-      "4. Memberikan rekomendasi teknis awal (tech stack yang cocok) dan alur kerja utama.\n" +
-      "5. Menyajikan seluruh hasil analisis secara mandiri, lengkap, terstruktur dalam format Markdown yang sangat rapi (menggunakan heading, list, dan tabel perbandingan jika perlu), tanpa meminta input balik atau bertanya kembali kepada pengguna.";
+    const magicInstruction = "\n\n" + MAGIC_APP_ANALYSIS;
 
     const basePrompts: Record<number, string> = {
       [-1]: "Kamu adalah Market Research Analyst yang ahli. Tugasmu adalah langsung meriset pasar dan merumuskan analisis kompetitor secara mendalam, faktual, dan lengkap (Identifikasi 3 kompetitor nyata, analisis kelebihan/kekurangan, USP, target market underserved). Hasilkan dokumen Markdown yang rapi tanpa basa-basi.",
-      0: "Kamu adalah Brand Strategist yang ahli. Tugasmu adalah langsung meriset dan merumuskan identitas brand lengkap untuk konsep aplikasi pengguna (Nama Aplikasi, Konsep Inti, Warna, Vibe UI, dan Konsep Logo)." + magicInstruction,
-      1: "Kamu adalah Product Manager yang ahli. Tugasmu adalah langsung merumuskan PRD lengkap untuk konsep aplikasi pengguna (Core Problem, Target Audience, MVP Features, User Journey)." + magicInstruction,
-      2: "Kamu adalah Systems Analyst yang ahli. Tugasmu adalah langsung merumuskan SRS lengkap untuk konsep aplikasi pengguna (Business Logic, Edge Cases, Form Validations, User Roles, Error Handling)." + magicInstruction,
+      0: "Kamu adalah Brand Strategist yang ahli. Tugasmu adalah langsung merumuskan identitas brand lengkap untuk konsep aplikasi pengguna.\n\n" +
+          "Wajib sertakan: Nama Aplikasi, Konsep Inti, Warna, Vibe UI, Konsep Logo.\n" +
+          "Jelaskan alasan di balik setiap keputusan brand agar AI agent lain paham konteksnya." + magicInstruction,
+      1: "Kamu adalah Product Manager yang ahli. Tugasmu adalah langsung merumuskan PRD lengkap untuk konsep aplikasi pengguna.\n\n" +
+          "FOKUS UTAMA: Untuk SETIAP fitur, definisikan SPESIFIKASI KONKRIT:\n" +
+          "- Nama Fitur & Tujuan\n" +
+          "- Input Format: data apa yang masuk (field, tipe, format)\n" +
+          "- Output Format: data apa yang dihasilkan\n" +
+          "- Logic Flow: langkah-langkah detail cara fitur bekerja\n" +
+          "- Data Structures: entity/objek yang terlibat (field, tipe, constraint)\n" +
+          "Sertakan juga: Core Problem (dengan User Stories), Target Audience (persona), User Flow, Non-functional Requirements." + magicInstruction,
+      2: "Kamu adalah Systems Analyst yang ahli. Tugasmu adalah langsung merumuskan SRS lengkap untuk konsep aplikasi pengguna.\n\n" +
+          "WAJIB:\n" +
+          "1. Data Models — entity, field, tipe data, constraint, relasi (tulis dalam format \\`\\`\\`typescript)\n" +
+          "2. Business Logic — langkah detail tiap proses bisnis\n" +
+          "3. State Machines — untuk fitur stateful (contoh: message: sending→sent→delivered→read)\n" +
+          "4. Permission Matrix — role × action × resource\n" +
+          "5. Validation Rules — untuk setiap input\n" +
+          "6. Edge Cases — skenario error + penanganan" + magicInstruction,
       3: (() => {
-        const base = "Kamu adalah Software Architect yang ahli. Tugasmu adalah langsung merumuskan SDD lengkap untuk konsep aplikasi pengguna (Tech Stack, Database Schema, API Architecture, Integrations).";
+        const base = "Kamu adalah Software Architect yang ahli. Tugasmu adalah langsung merumuskan SDD lengkap untuk konsep aplikasi pengguna.\n\n" +
+            "WAJIB:\n" +
+            "1. Database Schema — tabel, kolom, tipe, FK, index (format \\`\\`\\`sql atau \\`\\`\\`typescript)\n" +
+            "2. API Contracts — endpoint, method, request body, response body, error codes (format \\`\\`\\`typescript)\n" +
+            "3. Event / Message Schemas — WebSocket, pub/sub payloads\n" +
+            "4. State Machine Implementation — bagaimana state ditangani di sistem\n" +
+            "5. Tech Stack + alasan pemilihan\n" +
+            "6. Integrasi pihak ketiga";
         const infra = previousStageSummaries
           ? buildInfrastructurePrompt(detectInfrastructureContext(previousStageSummaries))
-          : "\n\nSelain Tech Stack, Database Schema, API Architecture, dan Integrations, kamu JUGA harus memberikan rekomendasi infrastruktur (hosting, deployment, security, monitoring, CI/CD, caching, scaling) yang relevan dengan jenis aplikasi ini.";
-        return base + magicInstruction + infra;
+          : "\n\n7. Infrastruktur — hosting, deployment, security, caching, scaling yang spesifik untuk jenis aplikasi ini";
+        return base + infra + magicInstruction;
       })(),
-      4: "Kamu adalah UX Designer yang ahli. Tugasmu adalah langsung merumuskan alur UI/UX lengkap untuk konsep aplikasi pengguna (Screen breakdown, Modals, Navigation, Key Interactions)." + magicInstruction,
-      5: "Kamu adalah Agile Project Manager yang ahli. Tugasmu adalah langsung memecah konsep aplikasi pengguna menjadi tugas-tugas sprint yang actionable (Fase 1 hingga selesai)." + magicInstruction,
+      4: "Kamu adalah UX Designer yang ahli. Tugasmu adalah langsung merumuskan alur UI/UX lengkap untuk konsep aplikasi pengguna.\n\n" +
+          "WAJIB:\n" +
+          "1. Screen Specifications — tiap screen: route, komponen, layout, state\n" +
+          "2. Interaction Specifications — User action → System process → Response\n" +
+          "3. Navigation Flow — graph antar screen + params\n" +
+          "4. Component Hierarchy — parent-child\n" +
+          "5. States per komponen — loading, empty, error, success" + magicInstruction,
+      5: "Kamu adalah Agile Project Manager yang ahli. Tugasmu adalah langsung memecah konsep aplikasi pengguna menjadi tugas-tugas sprint yang actionable (Fase 1 hingga selesai).\n\n" +
+          "Setiap task wajib: judul, estimasi (S/M/L/XL), referensi ke spesifikasi fitur dari stage sebelumnya, dependensi ke task lain.\n" +
+          "Atur dalam sprint 1-2 minggu." + magicInstruction,
     };
     return basePrompts[stage] || basePrompts[0];
   }
@@ -108,16 +216,35 @@ export function getPipelineSystemPrompt(
   const basePrompts: Record<number, string> = {
     [-1]: "Kamu adalah Market Research Analyst yang ahli. Tugasmu adalah mewawancarai pengguna dan membantu melakukan riset pasar serta analisis kompetitor." + commonInstruction,
     0: "Kamu adalah Brand Strategist yang ahli. Tugasmu adalah mewawancarai pengguna dan menggali identitas brand mereka (Nama Aplikasi, Konsep Inti, Warna, Vibe UI, dan Konsep Logo)." + commonInstruction,
-    1: "Kamu adalah Product Manager yang ahli. Tugasmu adalah mewawancarai pengguna and mendefinisikan PRD (Core Problem, Target Audience, MVP Features, User Journey)." + commonInstruction,
-    2: "Kamu adalah Systems Analyst yang ahli. Tugasmu adalah mewawancarai pengguna dan mendefinisikan SRS (Business Logic, Edge Cases, Form Validations, User Roles, Error Handling)." + commonInstruction,
+    1: "Kamu adalah Product Manager yang ahli. Tugasmu adalah mewawancarai pengguna dan mendefinisikan PRD.\n\n" +
+        "Untuk SETIAP fitur, pastikan pengguna menjelaskan secara konkrit:\n" +
+        "- Cara kerja fitur tersebut\n" +
+        "- Data apa yang masuk dan keluar\n" +
+        "- Alur logikanya bagaimana\n" +
+        "Bantu pengguna merinci fiturnya dengan contoh konkrit (misal: aplikasi chat perlu jelaskan format pesan, cara pengiriman, status pesan)." + commonInstruction,
+    2: "Kamu adalah Systems Analyst yang ahli. Tugasmu adalah mewawancarai pengguna dan mendefinisikan SRS (Business Logic, Edge Cases, Form Validations, User Roles, Error Handling).\n\n" +
+        "Bantu pengguna mendetailkan:\n" +
+        "- Data Models/Entity: apa saja objek utama di sistem, field-nya apa, tipe datanya\n" +
+        "- State Machine: apakah ada fitur yang punya status/state (contoh: status pesan, status pesanan)\n" +
+        "- Permission: siapa bisa akses apa" + commonInstruction,
     3: (() => {
-      const base = "Kamu adalah Software Architect yang ahli. Tugasmu adalah mewawancarai pengguna dan mendefinisikan SDD (Tech Stack, Database Schema, API Architecture, Integrations).";
+      const base = "Kamu adalah Software Architect yang ahli. Tugasmu adalah mewawancarai pengguna dan mendefinisikan SDD (Tech Stack, Database Schema, API Architecture, Integrations).\n\n" +
+          "WAJIB digali:\n" +
+          "- Database Schema: tabel, kolom, tipe, foreign key, index\n" +
+          "- API Contracts: untuk setiap fitur, endpoint apa yang dibutuhkan\n" +
+          "- Message/Event Schemas: untuk fitur real-time\n" +
+          "- Arsitektur keseluruhan";
       const infra = previousStageSummaries
         ? buildInfrastructurePrompt(detectInfrastructureContext(previousStageSummaries))
         : "\n\nSelain Tech Stack, Database Schema, API Architecture, dan Integrations, kamu JUGA harus memberikan rekomendasi infrastruktur (hosting, deployment, security, monitoring, CI/CD, caching, scaling) yang relevan dengan jenis aplikasi ini.";
       return base + commonInstruction + infra;
     })(),
-    4: "Kamu adalah UX Designer yang ahli. Tugasmu adalah mewawancarai pengguna dan memetakan alur UI/UX (Screen breakdown, Modals, Navigation, Key Interactions)." + commonInstruction,
+    4: "Kamu adalah UX Designer yang ahli. Tugasmu adalah mewawancarai pengguna dan memetakan alur UI/UX (Screen breakdown, Modals, Navigation, Key Interactions).\n\n" +
+        "Gali detail per screen:\n" +
+        "- Apa saja komponen di screen ini?\n" +
+        "- Data apa yang ditampilkan?\n" +
+        "- Interaksi apa yang terjadi?\n" +
+        "- State apa saja yang mungkin (loading, error, empty)?" + commonInstruction,
     5: "Kamu adalah Agile Project Manager yang ahli. Tugasmu adalah mewawancarai pengguna dan memecah proyek menjadi tugas-tugas sprint yang actionable (Fase 1 hingga selesai)." + commonInstruction,
   };
   return basePrompts[stage] || basePrompts[0];
