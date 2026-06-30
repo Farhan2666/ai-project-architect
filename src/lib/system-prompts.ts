@@ -19,7 +19,7 @@ Setiap fitur yang disebutkan HARUS memiliki spesifikasi konkrit:
 - **Logic Flow**: langkah detail cara fitur bekerja
 - **Data Structures**: entity/objek yang terlibat (field, tipe, constraint, relasi)
 
-Gunakan format kode blok (\\`\\`\\`typescript atau \\`\\`\\`json) untuk data structures, API contracts, dan schemas.
+Gunakan format kode blok (\`\`\`typescript atau \`\`\`json) untuk data structures, API contracts, dan schemas.
 Ini bukan soal menulis kode program, tapi mendefinisikan SPESIFIKASI yang cukup detail sehingga AI agent lain bisa langsung memahami struktur aplikasi tanpa perlu tanya ulang.`;
 
 export const SYSTEM_PROMPTS: Record<number, string> = {
